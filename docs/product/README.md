@@ -27,9 +27,10 @@ under review. [Provenance](provenance.md) preserves upstream attribution and his
 
 The living-spec branch adds provider enablement controls, draft/start lifecycle,
 three acceptance methods, grouped human decisions, versioned notes and a compact
-card for large requirement sets. Backend and provider-focused tests passed before
-the user requested a stop to protect host memory. Final UI and combined verification
-remain pending; the new feature is not yet accepted or deployed to the active app.
+card for large requirement sets. The lead completed serialized verification: 172 tests and affected-package
+typechecks passed. An isolated optimized app exercised a 100-requirement card,
+filters, draft/start, live check results and provider disable/discovery. Subjective
+human acceptance remains pending; the feature is not deployed to the active app.
 See [integration notes](../tmp/2026.09.20_factory-integration_deviations.md).
 
 ## Where specifications live

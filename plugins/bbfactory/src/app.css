@@ -581,7 +581,7 @@
   overflow-wrap: anywhere;
 }
 :where(a.factory-artifact) {
-  color: var(--accent);
+  color: var(--foreground);
   text-decoration: underline;
 }
 :where(.factory-notes) {
