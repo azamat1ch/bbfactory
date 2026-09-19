@@ -1,3 +1,4 @@
+import { assertExecutionOwnerSettled } from "./execution-owner-guard.js";
 import type {
   PluginRpcDiscoveryQuery,
   PublishedPluginRpcMethod,
@@ -1508,6 +1509,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
 
     async remove(id) {
       return withPluginOperationLock(REGISTRATION_MUTATION_KEY, async () => {
+        if (id === "workflows" || id === "factory-team") assertExecutionOwnerSettled(deps.dataDir, id);
         const row = getInstalledPlugin(deps.db, id);
         await withLifecycleLock(id, () => disposeOne(id));
         statuses.delete(id);
@@ -1560,6 +1562,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
 
     async setEnabled(id, enabled) {
       return withPluginOperationLock(REGISTRATION_MUTATION_KEY, async () => {
+        if (!enabled && (id === "workflows" || id === "factory-team")) assertExecutionOwnerSettled(deps.dataDir, id);
         if (!setInstalledPluginEnabled(deps.db, id, enabled)) return undefined;
         if (enabled) {
           const row = getInstalledPlugin(deps.db, id);

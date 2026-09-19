@@ -710,7 +710,7 @@ export function createWorkflowService(
             "Assignment workspace has active or unresolved execution ownership",
           );
       }
-      assertExecutionOwnerSettled(bb.server.experimental_dataDir, "factory-team");
+      assertExecutionOwnerSettled(bb.server.experimental_dataDir, "workflows");
       const created = createRun(
         db,
         {
@@ -894,7 +894,7 @@ export function createWorkflowService(
     if (options.outputSchema === null) {
       return `${header}\n\n${prompt}\n\nYour final text IS the return value (not a human-facing message), so return raw data.`;
     }
-    return `${header}\n\n${prompt}\n\nUse bb_workflow_result to return your final response in the requested structured format. You MUST call this tool exactly once at the end of your response with {"value": ...} to provide the structured output. The value must satisfy this JSON Schema:\n${JSON.stringify(options.outputSchema, null, 2)}\nIf the tool is unavailable during startup, return only the JSON value in your final response as a fallback. If the tool reports validation errors, correct the value and retry. You have at most ${MAX_REPAIR_ATTEMPTS} corrective retries.`;
+    return `${header}\n\n${prompt}\n\nUse bb_factory_result to return your final response in the requested structured format. You MUST call this tool exactly once at the end of your response with {"value": ...} to provide the structured output. The value must satisfy this JSON Schema:\n${JSON.stringify(options.outputSchema, null, 2)}\nIf the tool is unavailable during startup, return only the JSON value in your final response as a fallback. If the tool reports validation errors, correct the value and retry. You have at most ${MAX_REPAIR_ATTEMPTS} corrective retries.`;
   }
 
   function canReplayCall(run: WorkflowRunRow): boolean {
@@ -1254,7 +1254,7 @@ export function createWorkflowService(
           input: [
             {
               type: "text",
-              text: `Structured result missing or invalid (${detail}). Call bb_workflow_result with one value matching the required schema. Corrective turn ${attempts} of ${MAX_REPAIR_ATTEMPTS}.`,
+              text: `Structured result missing or invalid (${detail}). Call bb_factory_result with one value matching the required schema. Corrective turn ${attempts} of ${MAX_REPAIR_ATTEMPTS}.`,
               mentions: [],
             },
           ],
@@ -1405,7 +1405,7 @@ export function createWorkflowService(
           ? "This workflow worker is already terminal. Do not perform more work."
           : options.outputSchema === null
             ? null
-            : `You are a BB workflow worker. Submit your final value with bb_workflow_result. Required schema: ${JSON.stringify(options.outputSchema)}`,
+            : `You are a BB workflow worker. Submit your final value with bb_factory_result. Required schema: ${JSON.stringify(options.outputSchema)}`,
     };
   }
 

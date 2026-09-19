@@ -993,3 +993,13 @@ Guidance requires a stable guidanceId; exact retries return the durable receipt
 without resending. Wait accepts identity targets with afterCursor and a bounded
 timeoutMs, returning the first new completion and cursors. Neither submission
 nor completion establishes compliance or Factory acceptance.
+
+Factory owns new delegated execution internally; standalone Workflows is optional
+and disabled on fresh installations. `bb factory execution run|validate|status|history|list|stop`
+retains the durable runtime commands. `bb factory execution inspect|guide|guide-status|wait --input <json>`
+uses the discoverable execution schemas on `factory-team`; `guide` takes an
+execution identity, assignmentId, guidanceId, message and `steer`/`followUp` mode.
+`wait` takes `targets` with execution identities and `afterCursor`, plus a bounded
+timeoutMs. Start task assignments with `bb factory assign --input <json>`.
+Existing Workflows runs retain their owner and must settle before disabling its
+plugin. Factory can still inspect settled legacy task results afterward.

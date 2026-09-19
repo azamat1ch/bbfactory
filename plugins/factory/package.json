@@ -1,25 +1,25 @@
 {
-  "name": "bb-plugin-workflows",
+  "name": "bb-plugin-factory-team",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Run durable, provider-independent agent workflows.",
+  "description": "Factory: Team preferences, pragmatic guidance and requirement-linked checks.",
   "engines": {
     "bb": ">=0.0",
-    "bbPluginSdk": ">=0.4.102"
+    "bbPluginSdk": ">=0.4.106"
   },
   "bb": {
-    "name": "Workflows",
-    "description": "Run durable, provider-independent agent workflows.",
+    "name": "Factory",
+    "description": "Team preferences, pragmatic guidance and requirement-linked task checks.",
     "branding": {
       "icon": "Workflow"
     },
-    "server": "./src/server.ts",
-    "app": "./src/app.tsx",
+    "server": "./factory-server.ts",
+    "app": "./factory-app.tsx",
     "skills": [
       "skills"
     ],
-    "host": "./src/host.ts"
+    "host": "./factory-host.ts"
   },
   "keywords": [
     "bb-plugin"
@@ -31,26 +31,28 @@
   },
   "dependencies": {
     "@bb/shared-ui": "workspace:*",
+    "zod": "^4.3.6",
     "@jitl/quickjs-singlefile-cjs-release-sync": "^0.32.0",
     "acorn": "8.16.0",
     "acorn-walk": "^8.3.5",
     "ajv": "^8.20.0",
     "quickjs-emscripten-core": "^0.32.0",
-    "zod": "^4.3.6",
     "better-sqlite3": "12.10.0"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",
     "@get-bb/plugin-sdk": "workspace:*",
     "@testing-library/react": "^16.3.2",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "jsdom": "^29.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-7": "npm:typescript@^7.0.2",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "@types/better-sqlite3": "^7.6.12",
+    "@bb/db": "workspace:*",
+    "typescript-7": "npm:typescript@^7.0.2"
   }
 }

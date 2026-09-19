@@ -33,7 +33,7 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
-    name: "factory-team",
+    name: "factory",
     pluginId: "factory-team",
     defaultEnabled: true,
   },
@@ -180,7 +180,7 @@ export const BUILTIN_PLUGINS = [
   {
     name: "workflows",
     pluginId: "workflows",
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,
