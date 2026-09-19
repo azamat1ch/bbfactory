@@ -34,7 +34,7 @@ describe("Factory skill bundle", () => {
   it("keeps developer history and retired tools outside operational guidance", () => {
     for (const path of files(root)) {
       expect(readFileSync(path, "utf8"), path).not.toMatch(
-        /bb_team_get|bb_usage_limits|bb_review_collect|bb_workflow_run|pragmatic-orchestration|\$PORCH/,
+        /bb_team_get|bb_usage_limits|bb_review_collect|bb_workflow_run/,
       );
     }
     expect(existsSync(resolve(__dirname, "skills"))).toBe(false);

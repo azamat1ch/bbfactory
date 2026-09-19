@@ -96,3 +96,7 @@ provider-recordings/raw/
 
 /plugins/.bundled-stage-*/
 /plugins/*/.bundled-runtime/
+
+# Temporary task handovers belong in thread storage
+/docs/tmp/
+/tmp/

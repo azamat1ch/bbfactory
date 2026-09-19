@@ -1,30 +1,14 @@
 # bbfactory agent entry point
 
-Read [README.md](README.md) for setup and [product status](docs/product/README.md)
-for what exists. Load [spec.md](docs/product/spec.md) for product decisions and
-[first-slice.md](docs/product/first-slice.md) for current implementation work;
-follow architecture, source inventory and package docs only as needed.
+Read [README.md](README.md) for setup and [Factory](plugins/factory/README.md)
+for product behavior. Load package documentation only when relevant.
 
-- Factory is one installed plugin (`factory-team` is its compatibility ID), composed
-  from Team, guidance and task modules. Preserve the existing Team database ledger;
-  append task migrations. CLI: `bb factory`, `bb factory team`, `bb factory review`.
-- Reuse BB-native providers, threads, Workflows and plugin surfaces before adding
-  another runtime. Porch is an optional development tool, not a required product
-  dependency. Devin is one provider; no provider or model is the scheduler.
-- Direct execution is valid. Delegate only bounded independent work with a goal,
-  scope, relevant context, frozen interfaces, checks and a handover/result format.
-  Sol and Devin are peers; choose by suitability and availability.
-- Establish shared contracts before parallel work; isolate concurrent writers.
-  One integration owner verifies the combined result. Use the designated integration owner as the review gate, backed by source/test
-  evidence; do not create extra review agents without explicit authorization.
-- Keep one canonical product contract. Update it when behavior changes. Do not
-  copy the whole spec or transcripts into every worker brief. End-user projects
-  retain their own documentation layout.
-- Worker completion is not acceptance. Run appropriate checks against the actual
-  resulting content. Report implemented, tested and still-proposed work separately.
-
-The inherited engineering rules below apply unless a deliberate, documented
-product change supersedes them.
+- Factory is one plugin; preserve its `factory-team` storage identity and append-only migration ledger.
+- Reuse native BB threads, providers and environments. Factory owns its internal execution module.
+- Prefer direct work unless bounded delegation helps. Honor user instructions and Team preferences.
+- Preserve unrelated changes and active workers. Coordinate writers and expensive checks across the host.
+- Specs and evidence live in Factory; tests live in the target repository. Keep temporary handovers in thread storage.
+- Worker completion is not acceptance. Report implemented, verified and remaining work separately.
 
 ## Task Completion
 
