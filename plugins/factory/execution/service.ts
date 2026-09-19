@@ -1120,6 +1120,7 @@ export function createWorkflowService(
           continuation ??
           (await bb.sdk.threads.spawn({
             lifecycleOwnerThreadId: run.originThreadId,
+            parentThreadId: run.originThreadId,
             pluginMetadata: {
               workflowWorker: 1,
               runId: run.id,
@@ -1143,7 +1144,7 @@ export function createWorkflowService(
             ...(assignment === null
               ? {}
               : { serviceTier: assignment.serviceTier }),
-            visibility: "hidden",
+            visibility: "visible",
           }));
         if (reusedThreadId) {
           if (child.status !== "idle" || child.archivedAt != null)

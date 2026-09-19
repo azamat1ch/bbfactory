@@ -4,6 +4,7 @@ Factory combines remembered Team preferences, executable specs, native worker
 assignments, review and version-linked evidence in one BB plugin. Start in chat;
 use the [Factory skill](skills/factory/SKILL.md) when work needs orchestration.
 Direct work is valid. There is no required pipeline or reviewer roster.
+Factory workers appear as visible child threads under the originating conversation.
 
 The card shows outcome, scope and requirements. Expand a requirement for scenarios
 and evidence; approve the delivery or selected rows. Put detailed decisions in

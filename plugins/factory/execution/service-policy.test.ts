@@ -2404,6 +2404,9 @@ describe("native assignment execution RPC", () => {
     try {
       await eventually(() => expect(test.childCount()).toBe(1));
       expect(test.harness.sdk.callsTo("threads.spawn")[0]?.[0]).toMatchObject({
+        parentThreadId: input.originThreadId,
+        lifecycleOwnerThreadId: input.originThreadId,
+        visibility: "visible",
         environment: { environmentId: "worktree-a" },
         permissionMode: "accept-edits",
         serviceTier: "fast",
