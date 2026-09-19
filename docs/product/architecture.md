@@ -1,65 +1,68 @@
-# Native BB architecture
+# Factory architecture
 
-Factory owns product records and acceptance. Workflows and BB threads own
-execution. Direct work is valid; delegation, review and research are ordinary
-assignments, with optional worktrees and no fixed worker count or provider hierarchy.
+Factory owns Team preferences, specs, assignments, review and acceptance records.
+Its internal execution module reuses Workflows machinery and runs ordinary BB
+threads. The lead stays a normal conversation. Native providers, environments,
+Usage, Account Pooler, Retry and browser extensions remain independently reusable.
 
-| Owner | Responsibility |
-| --- | --- |
-| Factory | Team preferences/picker, adapted guidance, task/spec records, native associations, requirement-linked checks, review findings, acceptance and compact UI |
-| Workflows and BB threads | Scheduling, sessions, progress, transport, retries, cancellation and recovery |
-| Native environment providers | Existing checkouts, optional worktrees and supported environments |
-| Provider plugins, Provider Usage and Account Pooler | Execution/authentication, quota observations and supported account fallback |
+The [single package](../../plugins/factory/README.md) registers once, preserving
+runtime/storage identity `factory-team`. Modules separate Team, task records and
+card UI, execution, review processing and the one maintained `factory` skill.
+The database migration ledger is append-only: Team and task migration positions
+and contents remain unchanged, followed by execution and legacy-owner records.
 
-## One product feature
+## Execution and ownership
 
-The bundled [Factory package](../../plugins/factory-team/README.md) retains installed
-ID `factory-team`, its database and Team `get`/`set` RPCs. Composition adds task
-migrations after the original Team migration, registers the three modules once,
-and stages guidance assets automatically. The `bbfactory` and `factory-guidance`
-source packages are internal modules, not separate user toggles. Default agent
-selection includes Team, task and review tools plus both skills.
+Factory assignments call internal handlers. Canonical workspace locks coordinate
+writers; optional isolated worktrees permit parallel writers. Execution records
+support idempotent launches, guidance receipts, completion waits, cancellation,
+structured results and recovery. Completion alone does not prove native settlement
+or acceptance. Confirm settlement before transferring ownership.
 
-The canonical CLI is `bb factory <action>`, `bb factory team get|set` and
-`bb factory review collect`. Existing `bb team` scripts must use `bb factory team`.
-All Factory RPCs use `factory-team`; `builtin:` identifies package sources only.
-Workflows remains a separate reusable plugin enabled on fresh installs. Existing
-enabled/disabled choices are retained during upgrades.
+Existing Workflows runs retain their original database and owner. Settled legacy
+records remain inspectable with Workflows disabled. Unsettled legacy control uses
+its original owner; upgrades retain the saved enablement until explicit safe
+drain and disable. Fresh installs default standalone Workflows off. Symmetric
+read-only ownership guards conservatively block a new launch while the peer
+owner has active or unresolved runs. This whole-owner restriction can block
+otherwise disjoint work. Concurrent servers writing one data directory are not
+supported. The retained standalone source and vendored execution module currently
+require fixes to be applied to both; see its provenance file.
 
-## Native execution boundary
+## Context and preferences
 
-Workflows exposes typed discoverable experimental Start, Inspect, Cancel and
-Guide RPCs over its existing service. Per-assignment environment/access choices
-are recorded. Canonical root locks serialize competing checkout writers;
-isolated worktrees can run concurrently. Ownership text alone is advisory.
-Durable native launch identity supports recovery when the spawn reply is lost.
-Settlement is explicitly pending, unconfirmed or confirmed; thread completion
-alone does not establish that detached processes cannot write.
+Team defaults persist across new conversations; an explicit project preference
+wins over the remembered user default. Existing conversations retain their
+snapshots. Local overrides and reset remain available. Selected profiles constrain
+eligible models, not agent counts; explicit user directions override preferences.
 
-Factory reads the same versioned Team preference used by the picker, validates
-profiles on the target host and retains the preference revision and explicit
-user override. Selected profiles limit model choices, not worker count. Changes
-affect later assignments and never silently replace the user's lead or models.
+One conditional configuration exposes `bb_factory` and the `factory` skill to
+leads. Ordinary workers get bounded assignment guidance; execution workers get
+structured-result support where required. Shared BB context selection feeds
+Codex's app-server adapter and Devin's ACP path. Skill bodies load on demand.
+`bb thread context <id> --configuration` records BB-prepared instructions, catalog
+and tools. It cannot observe additions discovered inside the provider harness or
+prove the provider loaded a prepared snapshot.
 
-## Requirements and evidence
+## Evidence and delivery
 
-A task links requirements, optional scenarios and actual project checks. Host
-verification records content identity, full check/spec versions, environment,
-result and bounded logs. Linux systemd scopes contain check descendants;
-unsupported capture or unsettled checks remain unverified. Freshness is checked
-on reads and during active task polling. Changed content invalidates evidence.
+SQLite owns task spec revisions, findings, verification and approval records.
+Executable checks stay in the repository. A requirement can require automated,
+agent and human verification together (AND). Evidence names its procedure/scope,
+reviewer, verdict, support and limitations and binds to spec/code identity.
+Worker completion and unsupported reviewer approval do not satisfy requirements.
 
-A passing worker or command is insufficient when a requirement has no linked
-check, a required check fails, or a required review finding remains open. Human
-criteria require an explicit version/content-bound attestation. Stopping a task
-is permanent; subsequent work starts a new task after native settlement.
+Edits create revisions. Observed content changes permanently invalidate prior
+evidence, including observed changes away and back. Changes occurring entirely
+between observations cannot be detected. Unknown content remains unverified.
+Host checks use Linux systemd containment; unsupported or unsettled checks cannot
+produce a passing result.
 
-## Evidence limits
+Delivery snapshots remain historical when current coverage changes. Explicit
+human approval is recorded separately and can apply to all or selected rows;
+it never waives failed checks implicitly. Cancel is available only while execution
+runs; legacy stopped tasks can resume after settlement without launching workers.
+Export/import carries the spec and declared source revision, not acceptance.
 
-[Runtime and UI tests](first-slice.md) exercise these boundaries locally. They do
-not establish real-provider end-to-end delivery, universal process containment,
-external history-store parity or a 95% useful-behavior pass rate. The guidance
-collector validates supplied snapshots and outputs; it does not run agents or
-replace Factory acceptance. No quota optimizer or required Porch runtime exists.
-Draft PR #6 is superseded historical reference; this implementation started from
-main and uses native execution ownership. See [provenance](provenance.md).
+Resource safety is a short cooperative skill reference, not a scheduler or RAM
+limit. The lead coordinates expensive checks across workers sharing a host.

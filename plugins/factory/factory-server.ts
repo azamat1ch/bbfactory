@@ -25,7 +25,7 @@ export default async function registerFactory(bb: BbPluginApi) {
     await registerExecution(modules);
   registerExecutionCommands(modules, execution);
   registerFactoryTasks(modules, false, execution);
-  bb.agents.configure(async (context) => {
+  bb.agents.configure((context) => {
     if (
       service.agentConfiguration(context.thread.id) !== null ||
       context.origin.pluginId === bb.pluginId

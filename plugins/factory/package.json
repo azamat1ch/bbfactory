@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Factory: Team preferences, pragmatic guidance and requirement-linked checks.",
+  "description": "Factory: Team preferences, specs, native execution and review.",
   "engines": {
     "bb": ">=0.0",
     "bbPluginSdk": ">=0.4.106"
   },
   "bb": {
     "name": "Factory",
-    "description": "Team preferences, pragmatic guidance and requirement-linked task checks.",
+    "description": "Team preferences, specs, native execution and review.",
     "branding": {
       "icon": "Workflow"
     },

@@ -1,87 +1,49 @@
 # Factory
 
-The distribution installs **one Factory plugin** with the compatibility ID
-`factory-team`. Its composition entry points include this Team picker, task/check
-UI and host verification from [bbfactory](../bbfactory/README.md), and automatically
-staged [Pragmatic guidance](../factory-guidance/README.md). No separate guidance
-or task toggle is needed. Workflows stays separate and enabled on fresh installs.
+Factory combines remembered Team preferences, executable specs, native worker
+assignments, review and version-linked evidence in one BB plugin. Start in chat;
+use the [Factory skill](skills/factory/SKILL.md) when work needs orchestration.
+Direct work is valid. There is no required pipeline or reviewer roster.
 
-Existing Team preferences keep their database, scope keys and revisions. The
-composition appends task migrations after the original Team migration. Existing
-installation enable/disable choices are preserved. The consolidated CLI is
-`bb factory`: old `bb team get/set` commands become `bb factory team get/set`.
-Team `get`/`set` RPC names and `bb_team_get` remain compatible. Task and review
-RPCs use the same installed `factory-team` ID.
+The card shows outcome, scope and requirements. Expand a requirement for scenarios
+and evidence; approve the delivery or selected rows. Put detailed decisions in
+chat and record them through Factory. Delivery history and current verification
+are separate: a merged delivery remains delivered when later code changes.
 
-Bundled bbfactory composer control: **Team: Auto / Off / Selected**. Selected
-implementers use BB's real provider/model/reasoning/service-tier picker and live
-catalog, including Devin when installed. The lead picker is unchanged.
+## Commands
 
-Open Team, choose a mode from its dropdown, add or remove models, then Save.
-Add implementer previews a native selection before Add to team. Each provider/model
-can appear once, regardless of reasoning or tier. Editing a row to an already
-selected model consolidates those rows using the new selection. Cancel discards the
-editor draft. Thread composers save a conversation preference; new-thread
-composers save a clearly labelled project default for new conversations. Thread
-creation snapshots that default; existing conversations are not retroactively
-changed. Existing threads predating the plugin snapshot on first access.
-Saved preferences survive reload. Revision checks reject stale saves. Changes
-apply to future decisions, not workers already running or historical assignments.
+- `bb factory --help`: tasks, verification, approval, delivery and spec portability.
+- `bb factory team get --json`: this conversation's Team preference.
+- `bb factory team get --global --json`: remembered default for new chats.
+- `bb factory team set --help`: save a preference; `--local` changes only its scope.
+- `bb factory team reset --help`: restore an inherited preference.
+- `bb factory execution --help`: durable execution and supervision.
+- `bb factory review collect --help`: collect review results without losing failures.
+- `bb thread context <id> --configuration`: inspect BB-prepared session context.
 
-Provider discovery is routed through the thread environment or the selected
-existing machine/environment in the new-thread composer. A not-yet-created
-machine cannot supply a verified model catalog; create its environment first.
-Profiles are preferences, not worker counts, account identities or permission
-grants. The native picker reconciles model capabilities in the editor; nothing
-is persisted until Save. CLI input is shape-validated, and actual eligibility
-must be checked again at execution time.
+SQLite is authoritative for specs, revisions and evidence. `export`/`import`
+preserve spec meaning and source revision metadata; imported tasks start as fresh
+unverified drafts. Tests stay in the target repository. There is no repository
+synchronization. Multiple verification methods are combined with AND; delivery
+approval never converts failed automated or agent checks into passes.
 
-## Agent and CLI access
+## Package and upgrades
 
-The registered `bb_team_get` tool reads current persisted state for its caller's
-thread. Standing instructions tell the lead to call it before every new user
-task, so updates do not rely on replacing a running provider's system prompt.
-Explicit user instructions override the preference for a task. This is agent
-**guidance**, not hard enforcement of launch admission. Installing the plugin
-into an already running provider requires its next session start/resume to make
-the new tool available. There is no separate scheduler or worker progress UI.
+The single source package is `plugins/factory`. Its package name
+`bb-plugin-factory-team`, runtime ID `factory-team`, and storage identity remain
+unchanged. Existing Team and task migrations form an unchanged prefix; execution
+migrations append to it. Modules: `team`, `tasks` (including card UI), `execution`,
+`review`, and `skills`.
 
-- `bb factory team get [--thread <id> | --project <id>] --json`
-- `bb factory team set --mode auto|off|selected [--profiles '<JSON array>'] [--revision <n>] [--thread <id> | --project <id>] --json`
+New execution calls the internal module. Standalone Workflows defaults off on
+fresh installs and remains separately opt-in. Upgrades preserve its saved setting
+and original ownership of old runs. Drain and reconcile those runs before
+`bb plugin disable workflows`; the owner guard rejects disabling/removing an
+owner with active or unresolved execution. Legacy records are not copied into a
+second owner. Unresolved ownership conservatively blocks launches in the other
+store, even in disjoint workspaces. Do not reset either database.
 
-A profile has `providerId`, `model`, `reasoningLevel` and optional `serviceTier`.
-Omitting `--profiles` retains the saved list. Selected requires at least one
-profile; duplicate provider/model pairs are rejected, even with different reasoning or tiers. Thread scope defaults to the
-current CLI thread. Use `--revision` for optimistic concurrency when saving a
-previously read preference.
-
-SDK and generic CLI clients can discover the `factory-team` RPC `get` and `set`
-contracts through `bb plugin rpc inspect factory-team get --json` (and `set`).
-Both use `{scope: {kind: "thread" | "project", id}}`; set additionally requires
-`preference` and `expectedRevision`. The frontend, tool and CLI share storage.
-
-## Verification
-
-Run `pnpm exec turbo run test typecheck --filter=bb-plugin-factory-team` and
-`bb plugin build plugins/factory-team` from the repository. Automated checks
-exercise thread isolation, creation snapshots, reload persistence, live tool
-reads, invalid selections, stale saves, CLI parity and native picker routing.
-
-For a local path installation, first run
-`node plugins/factory-team/scripts/stage-assets.mjs`, then build and reload
-`factory-team`. This stages the guidance assets while preserving the installed
-plugin identity and saved Team choices. Bundled preparation stages them automatically.
-
-The shared native picker hides reasoning labels and controls when a model has
-only one effort, including ACP's agent-managed placeholder. Models exposing a
-real effort choice retain the control. Menus use BB's responsive overlay motion;
-the add form respects reduced-motion preferences.
-
-Local verification on 2026-09-19: 11 plugin tests and typecheck passed; the
-shared model picker's 47 tests and app build/typecheck passed; all 44 bundled
-build tasks passed. Live Chromium checks covered nested mode selection,
-duplicate prevention, persisted save/reload, mobile sizing, and Devin/OpenCode
-without a fixed reasoning control. No worker was launched by these UI checks.
-The built-in plugin suite passed 32 tests; two source-watcher reload tests timed
-out, including isolated retries. A standalone recursive `fs.watch` write probe
-also received no events in this environment. Explicit plugin reload succeeded.
+Host resource coordination is cooperative guidance: the lead arranges one heavy
+check at a time when costs are unknown. It does not constrain arbitrary shell
+commands. See [architecture](../../docs/product/architecture.md) and
+[execution provenance](execution/PROVENANCE.md) for deeper details.
