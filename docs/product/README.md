@@ -22,3 +22,12 @@ ownership, and [delivery slice](first-slice.md) for implemented checks and remai
 proof. [Acceptance](acceptance.md) defines the gates. Consult the large
 [parity map](parity-map.md) and [source inventory](coverage.md) only for a behavior
 under review. [Provenance](provenance.md) preserves upstream attribution and history.
+
+## Where specifications live
+
+The repository's [spec.md](spec.md) is the product contract. Per-task specs and
+their revisions, assignments and evidence are stored by Factory in the active
+BB data directory at `plugins/factory-team/data.db`. They are visible in the
+task card and through `bb factory`; they are not automatically written to Git.
+An agent can explicitly incorporate agreed decisions into repository docs.
+There is currently no automatic synchronization between those two stores.
