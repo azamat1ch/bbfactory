@@ -26,7 +26,12 @@ Read [references/factory.md](references/factory.md) for direct/planner/lean
 implementer/orchestrator modes, Team selection, requirement-linked checks, native
 assignment contracts and the `bb_review_collect` review-processing helper. That
 reference distinguishes the new Factory execution seam from generic workflow
-examples below. Factory owns acceptance; Workflows owns execution.
+examples below. Factory owns acceptance; Workflows owns execution. Refine the same draft card
+conversationally, propose acceptance methods and a compact explained team, then
+start when the user authorizes implementation. Use checks or evidence-backed
+agent review for most verifiable outcomes and a short guided human review for
+subjective judgments. Provider enablement is enforced by server policy; discovery
+must distinguish availability from authenticated subscription capacity.
 
 ## Execution context
 

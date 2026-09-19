@@ -40,8 +40,8 @@ command substitutions inside the file contents. Never interpolate untrusted
 text into the command itself.
 
 Actions: `create`, `update`, `status`, `list`, `verify`, `assign`, `cancel`,
-`finding`, `resolve`. Read the exposed schema before supplying fields.
-`judge` is a UI/CLI-only human attestation, never an agent action.
+`finding`, `resolve`, `start`, `agent-review`, `note`. Read the exposed schema before supplying fields.
+`judge` and `judge-many` are UI/CLI-only human attestations, never agent actions.
 A minimal direct-work specification is:
 
 ```json
@@ -151,3 +151,50 @@ raw union. Explicit empty findings are valid; empty responses and malformed XML
 are failed/malformed roster entries. complete reports roster completeness, not
 review correctness or Factory acceptance. Human review remains responsible for
 which defects matter and whether the proposed fixes are correct.
+
+
+## Conversational specification and review routing
+
+The lead owns judgment and integration. Provider infrastructure enforces
+eligibility; Factory persists the working agreement and acceptance; Workflows
+and native threads execute. Do not ask users to learn these components to get
+work done.
+
+Start by describing the problem and intended outcome in plain language. Create
+one draft card, refine it in place, preserve stable requirement IDs, and record
+why a version changed. State the target environment. Resolve only material
+ambiguity with the user; handle routine implementation choices yourself. Explicit
+user authorization to implement permits starting the task without asking again.
+Creating or editing the draft is not an execution request.
+
+Choose acceptance methods deliberately. Use executable checks for behavior,
+`agent` for outcomes adequately established by evidence-backed inspection, and
+`human` for subjective decisions or user-only knowledge. Avoid marking every UI
+requirement human. Give human requirements brief `reviewInstructions` and useful
+`artifactRefs`; group related judgments into a short review walkthrough.
+
+Discover enabled providers in the intended environment before proposing a team.
+Treat installed, authenticated, model-discovered and capacity-known as separate
+facts. Inspect usage when it affects the choice; do not infer quotas from names,
+duplicate a shared account across hosts, or interpret unsupported usage as free
+capacity. Selected profiles constrain eligibility, not counts. Explain the role,
+model and reason in a compact `teamPlan`; preserve the lead. An explicit request
+for ten workers should become bounded assignments run within native limits,
+not an invented change to concurrency or a silent reduction in requested scope.
+
+New tasks start in draft. `start` with taskId and expectedVersion activates the
+task without launching workers. `verify` runs configured executable checks;
+it does not spawn reviewers. For agent review, inspect the actual current result
+or arrange a bounded review, then use `agent-review` with requirementIds,
+expectedVersion, expectedFingerprint, reviewer, summary, limitations,
+artifactRefs and accepted. Record concrete evidence and uncertainty. Required
+unresolved findings still block acceptance. Only requirements explicitly using
+`agent` can be covered by this action; it never grants human approval.
+
+Use `note` to preserve compact decisions, blockers, deviations and conclusions,
+with artifact references. Keep proposed team rows distinct from actual native
+assignments. After integration, rerun relevant checks on final content and
+reconcile review findings. Offer a short human review guide only for the items
+that need it; a user can explicitly accept a listed selected set through
+`judge-many`. Never submit human judgment on the user's behalf without their
+explicit attestation of the current result. Spec approval is not result approval.

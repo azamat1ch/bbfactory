@@ -102,8 +102,8 @@ Gherkin and a dedicated BDD framework are optional.
 This is a capability of the Factory plugin, with compact requirement/check UI,
 not a separate test runner. Each check names the requirements it exercises;
 the lead or a worker writes or links the actual project test. Requirements
-without a matching check remain unverified unless an explicit human-review
-criterion applies. A passing command alone does not establish requirement
+without a matching check remain unverified unless their agreed acceptance
+method is evidence-backed agent review or explicit human review. A passing command alone does not establish requirement
 coverage or test quality.
 
 For example: given one remaining event place, when two users book concurrently,
@@ -147,3 +147,74 @@ versioned and reversible within the user's authority.
 Jev is an optional later routing/triage experiment with a rules-only baseline.
 It cannot establish available quota or correctness. Extra browser integrations
 and custom widgets remain installable extensions after the core path works.
+
+
+## Living specification and review
+
+The task card is a persistent working agreement, refined in the conversation.
+The lead writes a short problem statement and intended outcome, keeps scope and
+non-goals readable, and records material changes with a reason on the same task.
+A new task starts as Draft. Starting work is explicit; editing a draft never
+launches workers. Show the target environment before work starts. Existing
+records retain their historical identity and acceptance evidence.
+
+Large specifications support at least 100 requirements and scenarios. Use
+compact requirement rows, progress counts, search, method/status filters and
+bounded navigation. Preserve the user's expanded context and selection through
+ordinary progress updates; clear review selections when the reviewed version or
+content changes. Version history is collapsed by default and explains changes.
+
+Agree the acceptance method while refining each requirement:
+
+- Executable checks for objectively testable behavior. Link actual tests; prose
+  Given/When/Then scenarios alone do not execute.
+- Agent review for inspectable outcomes where recorded review is an adequate
+  criterion. Retain reviewer identity, summary, limitations, artifact references,
+  specification version and content identity. A completion claim is not review.
+- Human review for material subjective judgments or user-only knowledge. Keep
+  this set small, with concrete inspection steps and direct artifact links.
+
+A human can accept an explicitly selected, clearly listed set after reviewing
+it. Do not require repetitive personal-attestation checkboxes or a note on every
+routine acceptance. Requests for changes include useful context. Human approval
+remains an explicit user action; a worker cannot impersonate it. Missing content
+identity blocks acceptance with one actionable task-level explanation, rather
+than repeated technical warnings in every row.
+
+Show implementation activity separately from evidence status. Green means that
+the agreed acceptance method has current qualifying evidence and no blocking
+finding. Stale, failed, missing and uncertain evidence stay visible. A review
+summary distinguishes checks, agent review, unresolved findings and the small
+set awaiting the user's judgment. Verification runs configured executable
+checks; requesting agent review routes a contextual request to the lead, which
+chooses and supervises reviewers under the current Team preference.
+
+Persist concise notes, decisions, blockers and conclusions with versioned
+artifact references. Keep a proposed team distinct from actual native
+assignments and their outcomes. The card summarizes delivery; raw transcripts
+remain available on demand.
+
+## Provider eligibility and decision ownership
+
+A provider's installation, explicit user enablement, authentication, model
+catalog and observed subscription usage are different facts. Unknown facts
+remain unknown. A registered plugin or model catalog does not establish a paid
+subscription or spare capacity.
+
+Individual provider enablement is server policy, independent of plugin grouping.
+Disabled providers are excluded from new lead/model choices, Team choices,
+normal agent discovery, Auto decisions, quota views and quota polling. Settings
+retains them for re-enabling. Disabling one ACP provider does not disable its
+siblings. Saved disabled selections must produce an actionable error before a
+new launch, never a silent substitution. Preserve existing running work and
+historical attribution.
+
+The lead makes orchestration decisions using Pragmatic guidance; Factory stores
+the specification, Team preference, proposed assignments and acceptance; BB
+provider infrastructure supplies and enforces eligibility; native threads and
+Workflows execute. Skills guide judgment but cannot replace runtime enforcement.
+Auto filters eligibility first, considers task fit and trustworthy capacity
+observations, then briefly explains consequential choices. Explicit requested
+profiles and counts take precedence over its proposal, within real permission
+and concurrency limits. Ten requested Devin assignments can run in waves; the
+UI must not imply ten simultaneous workers when the host cannot run them.

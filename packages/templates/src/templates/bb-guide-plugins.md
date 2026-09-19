@@ -939,10 +939,17 @@ optional `serviceTier`. Each provider/model can appear once. Project defaults
 are snapshotted into new threads. This is delegation guidance; explicit task
 instructions override it. See the plugin's `team` skill for details.
 
-Tasks use `bb factory create|update|status|list|verify|assign|cancel|finding|resolve
+Tasks use `bb factory create|update|start|status|list|verify|assign|cancel|finding|resolve|agent-review|note
 --input '<JSON>'`. The `bb_factory` tool uses the same action/input schemas.
-`judge` is UI/CLI only and needs explicit human confirmation plus the displayed
-spec version and content fingerprint; agents must never fabricate approval.
+New tasks start as drafts; `start` activates the task without spawning workers.
+A spec can include problem, outcome, proposed team and up to 128 requirements.
+`verify` runs linked executable checks. `agent-review` records evidence-backed
+review only for agent criteria; `note` saves decisions, blockers and conclusions
+with artifact references. Neither grants human approval.
+`judge` and `judge-many` are UI/CLI only and need explicit human confirmation
+plus the displayed spec version and content fingerprint. Bulk judgment applies
+to the explicitly selected requirements atomically; agents must never fabricate
+approval. The card separates proposed team, actual work and acceptance evidence.
 All Factory RPCs, including Team get/set and collectReview, use `factory-team`.
 Use `bb plugin rpc inspect factory-team --json` for registered discoverable schemas.
 The former `bb team` CLI becomes `bb factory team`; saved preferences remain intact.
