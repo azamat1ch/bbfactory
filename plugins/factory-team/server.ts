@@ -18,11 +18,13 @@ import {
   type TeamScope,
 } from "./shared.js";
 
-export default function plugin(bb: BbPluginApi) {
+export const teamMigrations = [
+  "CREATE TABLE team_preferences (scope TEXT PRIMARY KEY, value TEXT NOT NULL)",
+];
+
+export default function plugin(bb: BbPluginApi, initializeStorage = true) {
   const db = bb.storage.database();
-  bb.storage.migrate(db, [
-    "CREATE TABLE team_preferences (scope TEXT PRIMARY KEY, value TEXT NOT NULL)",
-  ]);
+  if (initializeStorage) bb.storage.migrate(db, teamMigrations);
   const key = (scope: TeamScope) => `${scope.kind}:${scope.id}`;
   function read(scope: TeamScope): TeamRecord | null {
     const value = db

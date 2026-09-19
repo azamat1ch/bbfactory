@@ -3,8 +3,8 @@ import { z } from "zod";
 import { createFactoryService } from "./service.js";
 import { factoryRpcContract } from "./shared.js";
 
-export default function plugin(bb: BbPluginApi) {
-  const service = createFactoryService(bb);
+export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) {
+  const service = createFactoryService(bb, initializeStorage);
   const handlers = {
     factoryListTasks: async (
       input: z.infer<typeof factoryRpcContract.factoryListTasks.input>,
@@ -176,10 +176,9 @@ export default function plugin(bb: BbPluginApi) {
       }
     },
   });
-  bb.agents.configure(() => ({
-    tools: ["bb_factory"],
-    skills: [],
-    instructions:
+  bb.agents.contributeInstructions(() =>
       "Factory owns requirements and acceptance evidence. Work directly or assign ordinary native workers through bb_factory. Requirement-linked checks run on final content. Human judgments require explicit human authorization, never a worker's assertion.",
-  }));
+  );
 }
+
+export default registerFactoryTasks;

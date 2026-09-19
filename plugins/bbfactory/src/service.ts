@@ -27,9 +27,9 @@ type NativeSnapshot = z.infer<
 function launchArtifactId(taskId: string, launchId: string) {
   return `factory-launch:${JSON.stringify([taskId, launchId])}`;
 }
-export function createFactoryService(bb: BbPluginApi) {
+export function createFactoryService(bb: BbPluginApi, initializeStorage = true) {
   const db = bb.storage.database();
-  bb.storage.migrate(db, migrations);
+  if (initializeStorage) bb.storage.migrate(db, migrations);
   const store = createStore(db);
   const host = bb.hosts.experimental_client({ contract: factoryHostContract });
   const checks = new Map<string, AbortController>();

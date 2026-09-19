@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   definePluginApp,
+  type PluginAppBuilder,
   experimental_ProviderModelPicker as ProviderModelPicker,
   useComposer,
   useComposerView,
@@ -482,10 +483,12 @@ export function TeamAction() {
   ) : null;
 }
 
-export default definePluginApp((app) => {
+export function registerFactoryTeamUi(app: PluginAppBuilder) {
   app.composer.customize({
     id: "team",
     scopes: ["thread", "new-thread"],
     actions: [{ id: "team", component: TeamAction }],
   });
-});
+}
+
+export default definePluginApp(registerFactoryTeamUi);

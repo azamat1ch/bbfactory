@@ -9,16 +9,17 @@
     "bbPluginSdk": ">=0.4.106"
   },
   "bb": {
-    "name": "Factory Team",
-    "description": "Choose automatic, direct, or selected implementers in normal chat.",
+    "name": "Factory",
+    "description": "Team preferences, pragmatic guidance and requirement-linked task checks.",
     "branding": {
       "icon": "Workflow"
     },
-    "server": "./server.ts",
-    "app": "./app.tsx",
+    "server": "./factory-server.ts",
+    "app": "./factory-app.tsx",
     "skills": [
       "skills"
-    ]
+    ],
+    "host": "./factory-host.ts"
   },
   "keywords": [
     "bb-plugin"
@@ -30,7 +31,9 @@
   },
   "dependencies": {
     "@bb/shared-ui": "workspace:*",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "bb-plugin-bbfactory": "workspace:*",
+    "bb-plugin-factory-guidance": "workspace:*"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",
@@ -43,6 +46,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "@types/better-sqlite3": "^7.6.12"
   }
 }
