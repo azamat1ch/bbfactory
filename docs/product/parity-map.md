@@ -7,7 +7,8 @@ The primary delivery vehicle for the orchestration practices is an adapted **nat
 ## Integrated evidence update — September 20
 
 The single Factory bundle now includes the adapted skill, preserved prompts and
-review collector. Workflows Start/Inspect/Cancel/Guide, native settlement and
+review collector. Workflows Start/Inspect/Cancel/Guide, durable guidance receipts,
+cursor-based completion waits, native settlement and
 canonical workspace ownership are implemented. Factory adds requirement-linked
 immutable evidence, host checks, freshness and human-judgment guards, plus compact
 UI. [Delivery-slice tests](first-slice.md) identify the concrete local evidence.
@@ -18,6 +19,11 @@ These implementations improve several historical A/N rows below without proving
 all their sub-behaviors. No row-level or 95% coverage claim follows. External
 history inspection/analytics, broader review-plan execution, real-provider
 end-to-end acceptance and the complete platform/recovery matrix remain pending.
+
+The tables below retain the original assessment and proposed acceptance work;
+their pending wait/steering descriptions are superseded by this update and the
+current port ledger. For this implementation pass, the parent integrates and
+verifies the six implementation tracks, per the user's latest instruction.
 
 ## Dispositions and measurement proposal
 

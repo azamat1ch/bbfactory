@@ -91,14 +91,19 @@ worker's success or failure. A timeout ends observation, not the task.
 
 The supported SDK cross-plugin seam is Workflows RPC, plugin id
 `workflows`: `experimental_executionStart`,
-`experimental_executionInspect`, `experimental_executionCancel`, and
-`experimental_executionGuide`, called through `bb.sdk.plugins.callRpc`.
+`experimental_executionInspect`, `experimental_executionCancel`,
+`experimental_executionGuide`, `experimental_executionGuideStatus`, and
+`experimental_executionWait`, called through `bb.sdk.plugins.callRpc`.
 Identity is originThreadId + callerTaskId + launchId. Do not import Workflows'
 private service/database or shell out from a server to start workers.
 
-Execution Guide adds assignmentId, message and mode (`steer` or `followUp`);
-its result says delivery=`submitted`, compliance=`unverified`. Observe artifacts
-to establish compliance. Do not retry an uncertain send blindly. Existing native
+Execution Guide adds a stable guidanceId, assignmentId, message and mode
+(`steer` or `followUp`). A durable receipt records delivery=`submitted` or
+`uncertain`, always with compliance=`unverified`. An identical retry returns the
+saved receipt without sending again; changed content for that guidanceId is
+rejected. GuideStatus retrieves the receipt after reconnect. Observe artifacts
+to establish compliance; uncertain delivery is not permission to send a duplicate.
+Existing native
 thread CLI communication is `bb thread tell <id> --mode auto --message-file FILE`.
 The old generic workflow `agent()` path inherits origin access; the new execution
 assignment explicitly records environment and permissionMode. Neither supplies
@@ -109,8 +114,14 @@ A settled thread is not proof that detached provider-side processes stopped.
 Block overlapping replacement writers while ownership remains uncertain. Preserve
 useful partial changes, reconcile failures and queues, then issue an explicit
 remaining-work brief. Continue a healthy native thread for related follow-up;
-reconcile failed or uncertain state before replay. There is no claim of a Porch
-continuation lease or idempotent guidance ledger.
+reconcile failed or uncertain state before replay. The guidance ledger prevents duplicate sends; it does not implement a Porch
+provider-session continuation lease.
+
+Wait accepts up to 32 identity targets with afterCursor and timeoutMs (0–30000).
+It returns the first uncollected assignment/run completion, bounded output and
+per-target cursors. Reuse each returned cursor to avoid collecting an event twice.
+A timeout or disconnected observer never cancels workers. Completion does not
+prove native settlement or Factory acceptance; inspect those separately.
 
 ## Review processing
 

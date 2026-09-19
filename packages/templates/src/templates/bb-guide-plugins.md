@@ -974,9 +974,15 @@ Pooler; reading a limit does not prove fallback or choose a replacement model.
 ## Native Workflows assignments
 
 The optional Workflows plugin publishes experimental_executionStart,
-experimental_executionInspect, experimental_executionCancel and
-experimental_executionGuide. Inspect schemas with `bb plugin rpc inspect
+experimental_executionInspect, experimental_executionCancel,
+experimental_executionGuide, experimental_executionGuideStatus and
+experimental_executionWait. Inspect schemas with `bb plugin rpc inspect
 workflows --json` and call through `bb plugin rpc call` with an input
 file. Preserve caller task/launch identity for idempotency; unresolved spawn or
 stop blocks overlapping replacement. Existing native environments and optional
 worktrees are supported. See the Workflows skill for access and settlement limits.
+
+Guidance requires a stable guidanceId; exact retries return the durable receipt
+without resending. Wait accepts identity targets with afterCursor and a bounded
+timeoutMs, returning the first new completion and cursors. Neither submission
+nor completion establishes compliance or Factory acceptance.

@@ -120,6 +120,12 @@ rationale).
 
 ## Current integration delta
 
+Workflows now supplies durable `guidanceId` receipts, status lookup and bounded
+cursor-based first-completion waits. The earlier group-wait and retry-safe
+guidance gaps are superseded by these native adaptations, documented in
+`references/factory.md`. Provider continuation leases and the full Porch
+acknowledgement protocol remain outside this implementation.
+
 The donor ledger above records the initial adaptation. This port additionally
 adds `references/factory.md`, complete provider-neutral depth compositions, a
 pure TypeScript review collector (`review.ts`), and tool/RPC/CLI registrations.

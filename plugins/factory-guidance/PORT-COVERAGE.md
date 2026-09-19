@@ -183,8 +183,11 @@ acceptance work. No inventory percentage is claimed.
 - Generic workflow examples inherit origin permissions; assignment-specific
   environments/access require the new execution seam. No portable read-only
   confinement or detached-process stop guarantee is inferred.
-- Group acknowledged wait-any, durable idempotent steering, provider continuation
-  leases, diagnostic redaction and twelve-store history/analytics remain gaps.
+- Workflows now provides cursor-based first-completion waits and durable guidance
+  receipt deduplication, tested in `plugins/workflows/src/service-policy.test.ts`.
+  These are native adaptations, not full Porch mailbox/acknowledgement parity.
+  Provider continuation leases, diagnostic redaction and twelve-store
+  history/analytics remain gaps.
 - Review plans are fully specified guidance (including super 9-pass and ultra
   20-pass ordering), not an automatic launcher. Judge fallback selection/launch,
   input snapshot freshness and omitted-roster detection remain caller duties.

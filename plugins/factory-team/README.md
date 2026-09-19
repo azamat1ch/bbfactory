@@ -67,6 +67,11 @@ Run `pnpm exec turbo run test typecheck --filter=bb-plugin-factory-team` and
 exercise thread isolation, creation snapshots, reload persistence, live tool
 reads, invalid selections, stale saves, CLI parity and native picker routing.
 
+For a local path installation, first run
+`node plugins/factory-team/scripts/stage-assets.mjs`, then build and reload
+`factory-team`. This stages the guidance assets while preserving the installed
+plugin identity and saved Team choices. Bundled preparation stages them automatically.
+
 The shared native picker hides reasoning labels and controls when a model has
 only one effort, including ACP's agent-managed placeholder. Models exposing a
 real effort choice retain the control. Menus use BB's responsive overlay motion;

@@ -65,13 +65,15 @@ cancels nor restarts the worker. Exit `3` is an invalid request and `4` means
 the server was unreachable; both are observer errors, not worker outcomes.
 Collect the final answer with `bb thread output <thread-id>`.
 
-**There is no group wait-any command.** When supervising several workers,
-keep the full id set and loop bounded `bb thread wait` calls over the
-outstanding ids, or express the whole fan-out as one `bb workflows run`
-script whose `parallel()` settles all workers and reports each outcome.
-Track which terminal results you have already collected so nothing is
-reviewed twice; the parent owns group membership — do not infer it from
-unrelated threads or a shared directory.
+For Factory assignment launches, Workflows `experimental_executionWait` observes
+up to 32 execution identities and returns the first new terminal assignment or
+run event. Supply each identity's `afterCursor` (initially 0), then retain returned
+cursors. `timeoutMs` is bounded to 30000 and never cancels work. Output previews
+are bounded; retrieve full native output only when useful. See
+[the execution contract](factory.md#assignments-and-supervision).
+For independently launched native threads, use bounded `bb thread wait` calls
+or one workflow whose `parallel()` reports each result. The lead owns the target
+set; do not infer membership from unrelated threads or a shared directory.
 
 ### Keeping the parent active
 

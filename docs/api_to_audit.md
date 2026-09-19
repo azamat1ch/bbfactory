@@ -3205,11 +3205,12 @@ progress, cross-project ownership, and concurrent creation before binding.
 
 ## Native Workflows execution RPC
 
-`builtin:workflows` publishes `experimental_executionStart`,
-`experimental_executionInspect`, `experimental_executionCancel` and
-`experimental_executionGuide`. The schemas live in
+`workflows` publishes `experimental_executionStart`,
+`experimental_executionInspect`, `experimental_executionCancel`,
+`experimental_executionGuide`, `experimental_executionGuideStatus` and
+`experimental_executionWait`. The schemas live in
 `plugins/workflows/src/execution-contract.ts`; discover them through
-`bb plugin rpc inspect builtin:workflows` and invoke through
+`bb plugin rpc inspect workflows` and invoke through
 `bb.sdk.plugins.callRpc` or `bb plugin rpc call`.
 
 Start binds `(originThreadId, callerTaskId, launchId)` to one immutable request
@@ -3223,7 +3224,11 @@ Cancelled and failed runs can retain unconfirmed native ownership. Unknown spawn
 responses and failed stop acknowledgements block overlapping replacement until
 native discovery and strict stop reconcile them. `nativeSettlement` and cancel's
 `stopConfirmed` concern native threads only, never detached processes or write
-confinement. Guidance reports submission, not observed compliance. Public thread
+confinement. Guidance records caller guidanceId before sending; exact retries
+return submitted/uncertain receipts without duplicate delivery. Compliance remains
+unverified. Wait uses durable event cursors and native subscriptions for the first
+completion across up to 32 identities, with a 30-second observation bound and
+truncated output. Completion is not settlement or acceptance. Public thread
 stop now propagates the existing strict settlement failures, including offline
 hosts, instead of returning successful acknowledgement for an uncertain stop.
 
