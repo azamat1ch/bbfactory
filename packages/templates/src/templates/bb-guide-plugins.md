@@ -937,3 +937,19 @@ project default. A profile names `providerId`, `model`, `reasoningLevel` and
 optional `serviceTier`. Each provider/model can appear once. Project defaults
 are snapshotted into new threads. This is delegation guidance; explicit task
 instructions override it. See the plugin's `team` skill for details.
+
+Factory review collection
+-------------------------
+
+When Factory guidance is present, `bb review collect --input '<JSON>'` collects
+completed independent reviewer outputs. Input contains `passes` with unique
+`id`, `agent`, `role`, `output` and `error` (null for absent output/error), optional
+`sources` with `path`/`content`, and optional raw `judge` JSON text. The matching
+agent tool is `bb_review_collect`; discoverable RPC is `collectReview`.
+
+This operation launches no workers. It returns the supplied roster, sorted and
+indexed findings, XML union, quote checks on supplied snapshots, and optional
+validated judge results. An invalid judge retains the raw union as degraded.
+Exit 2 means partial roster or degraded judge; it does not discard good outputs.
+Attribution and snapshot freshness are caller-supplied; collection is not Factory
+task acceptance. See the Pragmatic Orchestration skill for native review plans.

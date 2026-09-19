@@ -225,3 +225,9 @@ protocol behavior and platform limitations must be tested, not assumed equivalen
 - `bash scripts/porch --help` and `--list-agents` executed (exit 0; XML plan enumerates all 23 configured profiles).
 - Read-only inspection of all cited paths; no upstream, BB, or workspace files outside `coverage/` were modified.
 - No upstream tests were run; no acceptance scenarios above have been executed — all statuses are `pending` by construction.
+
+## Native guidance implementation evidence
+
+The [Factory guidance port ledger](../../plugins/factory-guidance/PORT-COVERAGE.md)
+maps every stable source ID to instruction and local-test evidence. It does not
+claim runtime equivalence or an achieved percentage.
