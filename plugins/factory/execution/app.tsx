@@ -657,7 +657,7 @@ function WorkflowStatusBannerLoaded({ threadId }: { threadId: string }) {
   if (state.status !== "ready" || state.runs.length === 0) return null;
 
   return (
-    <section aria-label="Active workflows" className="space-y-2">
+    <section aria-label="Active execution" className="space-y-2">
       {state.runs.map((run) => (
         <WorkflowComposerCard key={run.id} run={run} />
       ))}
@@ -1025,7 +1025,7 @@ function WorkflowRunPanelLoaded({
             disabled={stopping}
             onClick={() => void stop()}
           >
-            {stopping ? "Stopping…" : "Stop workflow"}
+            {stopping ? "Stopping…" : "Cancel execution"}
           </Button>
         </div>
       ) : null}
@@ -1040,7 +1040,7 @@ export function registerExecutionUi(app: PluginAppBuilder) {
   });
   app.slots.threadPanelAction({
     id: WORKFLOW_PANEL_ACTION_ID,
-    title: "Workflow run",
+    title: "Factory execution",
     icon: "Workflow",
     component: WorkflowRunPanel,
     layout: "flush",

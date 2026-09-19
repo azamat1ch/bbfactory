@@ -138,7 +138,7 @@ ownership remains uncertain.
 ## Review processing
 
 `bb factory review collect --input '<JSON>'` — also exposed as the
-`bb_review_collect` tool and the discoverable `collectReview` RPC — is a pure
+discoverable `collectReview` RPC — is a pure
 result processor for reviews you already collected. It launches no agents.
 
 It takes `passes`: `{id, agent, role, output, error}` (explicit null for

@@ -3,7 +3,7 @@ name: provider-usage
 description: Inspect subscription limits, account usage, reset times and freshness across enabled providers and pooled accounts.
 ---
 
-Use `bb usage limits --json` or the `bb_usage_limits` agent tool to read the
+Use `bb usage limits --json` to read the
 same aggregate as Provider usage. All eligible provider resources are measured,
 with at most three resource requests in flight. Recent cache is accepted for
 one minute. Use `bb usage limits --force --json` for a fresh attempt.

@@ -54,8 +54,8 @@ choose **Hide** to move it into **More**. Settings → Appearance → Sidebar fo
 controls order and visibility for every footer action. The usage settings page
 remains available. These preferences belong to BB, not the plugin.
 
-Leads can inspect all subscriptions with the `bb_usage_limits` agent tool,
-`bb usage limits [--force] [--json]`, or the discoverable `readLimits` RPC.
+Leads can inspect all subscriptions with `bb usage limits [--force] [--json]`
+or the discoverable `readLimits` RPC.
 They reuse this aggregate with bounded collection across all eligible providers
 and preserve source observation times, fetch times and failed-refresh markers.
 See [the usage skill](skills/provider-usage/SKILL.md) for the request and freshness
