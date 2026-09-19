@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Factory</title>
+  <desc id="desc">Two linked work bays beneath a rising factory roof.</desc>
+  <path fill="#25282c" fill-rule="evenodd" d="M16 18a6 6 0 0 1 12 0v22l20-13v17l24-15a5 5 0 0 1 8 4v43a8 8 0 0 1-8 8H24a8 8 0 0 1-8-8V18Zm15 37a7 7 0 0 0-7 7v3a7 7 0 0 0 7 7h10a7 7 0 0 0 7-7v-3a7 7 0 0 0-7-7H31Zm24 0a7 7 0 0 0-7 7v3a7 7 0 0 0 7 7h10a7 7 0 0 0 7-7v-3a7 7 0 0 0-7-7H55Z"/>
+</svg>

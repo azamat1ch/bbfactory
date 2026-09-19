@@ -1,46 +1,24 @@
-# Product status and navigation
+# Product status
 
-bbfactory is a preconfigured BB distribution for coordinating coding agents and
-existing subscriptions. Product behavior lives in native BB plugins and small,
-justified core changes. Users should experience one coherent workspace.
+bbfactory is a BB distribution for working directly or coordinating coding agents
+with existing subscriptions. One Factory plugin combines Team preferences,
+Pragmatic guidance and requirement-linked task checks. Workflows owns execution.
 
-## What exists
+| Area | Implemented and locally tested | Still to prove |
+| --- | --- | --- |
+| Factory | Existing Team picker/preferences, task/spec versions, check mapping, immutable evidence, findings and guarded human judgments; compact task/check UI | Real feature completed and reviewed through the integrated app |
+| Native execution | Discoverable Workflows start/inspect/cancel/guide, canonical checkout locking, isolated concurrent worktrees and conservative settlement | Real-provider/platform recovery matrix and full supervision behavior parity |
+| Guidance | Bundled skill/references/prompts; attributed review collector, quote checks and judge validation | Observed instruction compliance; external session-store inspection and analytics |
+| Packaging | One Factory plugin with automatic guidance assets; original Team identity/database retained; Workflows enabled on fresh installs | Optimized app staging and fresh/live startup smoke after integration; Electron smoke |
+| Providers/capacity | Native providers, usage display and optional account pooling; [support matrix](provider-support.md) | Account-specific execution, usage and fallback checked separately; no efficiency claim |
 
-| Area          | Verified now                                                                                                                                                               | Still to build                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Repository    | Private `azamat1ch/bbfactory`; `kametayturar` has write access; canonical product docs in this repo                                                                        | Product CI and release packaging                                                          |
-| Foundation    | Frozen install, 50 build tasks, 98 typecheck tasks and browser/server smoke; [baseline](baseline.md)                                                                       | Electron smoke; future runtime changes need their own checks                              |
-| Orchestration | BB has native threads and durable Workflows; external Porch/Devin runs helped bootstrap this repo                                                                          | Integrated task/spec contracts, supervision policy, cross-review and verified delivery    |
-| Providers     | Inherited Codex/Claude and ACP providers, including Cursor/OpenCode; merged Devin declaration                                                                              | Real account checks; validate a GLM/Z.ai execution route                                  |
-| Capacity      | Inherited usage UI and experimental Codex/Claude account pooling                                                                                                           | Coherent subscription view, pool-aware allocation and recovery across supported providers |
-| Chat          | Native Team Auto/Off/Selected preference plugin with the real model picker, CLI/tool access and persisted defaults; [implementation](../../plugins/factory-team/README.md) | Native task/check evidence, orchestration acceptance and later plan/lineage views         |
-| Efficiency    | No measured improvement yet                                                                                                                                                | Compare complete accepted runs including coordination, retries and review                 |
+Automated slice tests are evidence for the cases they exercise, not complete
+product acceptance. Unsupported verification environments, stale content and
+uncertain execution remain visibly unverified. No 95% parity claim is established;
+135 inventory IDs are a source map, not a behavioral pass rate.
 
-Provider presence is source evidence, not a successful run with the user's
-account. Usage reporting and account rotation must be verified independently.
-Devin support is merged; successful account execution remains a separate check.
-The first task/check runtime and native guidance bundle remain in separate
-implementation worktrees. Team preferences do not establish that delivery slice.
-
-## Read only what you need
-
-1. [Specification](spec.md): product outcomes, confirmed choices and invariants.
-2. [First slice](first-slice.md): the next buildable deliverable and its checks.
-3. [Architecture](architecture.md): native BB capabilities, gaps and ownership.
-4. [Chat and demo](chat-and-demo.md): the proposed interaction and demo target.
-
-For acceptance review, use [acceptance.md](acceptance.md). For adapting an
-upstream behavior, consult the relevant rows of [parity-map.md](parity-map.md)
-and its underlying [source inventory](coverage.md).
-That large inventory is a source reference, not mandatory onboarding reading or
-a requirement to reproduce Porch internals. [Provenance](provenance.md) records
-source pins, historical plans and the repository history reset.
-
-For provider execution, usage and rotation, see the source-reviewed
-[support matrix](provider-support.md). It separates source behavior from reported
-local probes and unverified subscription paths.
-
-The next implementation task is the native one-task delivery slice. Establish
-its integration contract, then split server policy, host verification and UI
-work behind that contract. Broader allocation and parallel-worker features
-follow the same product specification.
+Read [specification](spec.md) for decisions, [architecture](architecture.md) for
+ownership, and [delivery slice](first-slice.md) for implemented checks and remaining
+proof. [Acceptance](acceptance.md) defines the gates. Consult the large
+[parity map](parity-map.md) and [source inventory](coverage.md) only for a behavior
+under review. [Provenance](provenance.md) preserves upstream attribution and history.

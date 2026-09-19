@@ -25,7 +25,7 @@ separate planning conversation.
   native environments or non-overlapping ownership, and retain one integration
   owner. Reviewer, researcher and implementer are roles, not provider ranks.
 
-Read `bb_team_get` or `bb team get --json` before selecting workers. Honor
+Read `bb_team_get` or `bb factory team get --json` before selecting workers. Honor
 Auto/Off/Selected and explicit user overrides. Selected limits eligible
 profiles, not the number of workers. Discover actual provider availability and
 reasoning choices. Never silently substitute a profile, reset a saved preference,
@@ -40,7 +40,8 @@ command substitutions inside the file contents. Never interpolate untrusted
 text into the command itself.
 
 Actions: `create`, `update`, `status`, `list`, `verify`, `assign`, `cancel`,
-`finding`, `resolve`, `judge`. Read the exposed schema before supplying fields.
+`finding`, `resolve`. Read the exposed schema before supplying fields.
+`judge` is a UI/CLI-only human attestation, never an agent action.
 A minimal direct-work specification is:
 
 ```json
@@ -66,7 +67,9 @@ unless exercised by a check. `verify` takes `{ "taskId": "<id>" }` and runs the
 declared checks independently of worker claims. `status` takes the same input.
 An `update` includes expectedVersion, the complete spec, and changeReason;
 changed requirements/checks require fresh evidence. Human criteria use `judge`
-with requirementId, accepted, actor and rationale; never invent human approval.
+with requirementId, accepted, actor, rationale, humanConfirmed:true, and the
+expectedVersion and expectedFingerprint shown for the current task. Changed
+content or specification rejects it. Never invent human approval.
 A successful worker or review judge is not acceptance. Recheck final integrated
 content; stale, failed, unmapped and unknown requirements stay visible.
 
@@ -115,8 +118,8 @@ Use `bb_review_collect` for deterministic collection after native reviewers
 finish. It takes `passes`: `{id, agent, role, output, error}` (explicit null for
 missing output/error), optional `sources`: `{path, content}` snapshots, and
 optional `judge`: the raw judge JSON string. The same operation is exposed as
-`bb review collect --input '<JSON>'` and discoverable RPC `collectReview` in the
-internal guidance package. These surfaces run no agents.
+`bb factory review collect --input '<JSON>'` and discoverable RPC `collectReview` in the
+composed `factory-team` plugin. These surfaces run no agents.
 
 Collect without a judge first. Supply the returned unionXml to the preserved
 judge prompt for super/ultra, run that judge through native execution, then

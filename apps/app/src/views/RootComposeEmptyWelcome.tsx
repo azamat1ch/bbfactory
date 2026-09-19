@@ -1,6 +1,6 @@
 import { Icon, type IconName } from "@bb/shared-ui/icon";
 import { usePrefersReducedMotion } from "@bb/shared-ui/hooks/use-media-query";
-import bbLogoUrl from "../../../../assets/bb-logo.svg";
+import factoryLogoUrl from "../../../../assets/factory-logo.svg";
 
 interface RootComposeEmptyWelcomeProps {
   onCompose: (prompt?: string) => void;
@@ -116,18 +116,20 @@ export function RootComposeEmptyWelcome({
       </svg>
       <div
         role="img"
-        aria-label="bb"
-        className="h-24 w-28 select-none"
+        aria-label="bbfactory"
+        className="size-24 select-none"
         style={{ filter: "url(#bb-gloss)" }}
       >
         <img
-          src={bbLogoUrl}
+          src={factoryLogoUrl}
           alt=""
           aria-hidden
           draggable={false}
           className="size-full object-contain dark:invert"
         />
       </div>
+      <div className="text-xl font-semibold">bbfactory</div>
+      <p className="text-sm opacity-60">Your coding subscriptions, working as one team.</p>
       <div className="flex w-full max-w-[360px] flex-col gap-1">
         <WelcomeAction
           icon="MessageSquarePlus"

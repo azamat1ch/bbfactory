@@ -1,4 +1,17 @@
-# Factory Team
+# Factory
+
+The distribution installs **one Factory plugin** with the compatibility ID
+`factory-team`. Its composition entry points include this Team picker, task/check
+UI and host verification from [bbfactory](../bbfactory/README.md), and automatically
+staged [Pragmatic guidance](../factory-guidance/README.md). No separate guidance
+or task toggle is needed. Workflows stays separate and enabled on fresh installs.
+
+Existing Team preferences keep their database, scope keys and revisions. The
+composition appends task migrations after the original Team migration. Existing
+installation enable/disable choices are preserved. The consolidated CLI is
+`bb factory`: old `bb team get/set` commands become `bb factory team get/set`.
+Team `get`/`set` RPC names and `bb_team_get` remain compatible. Task and review
+RPCs use the same installed `factory-team` ID.
 
 Bundled bbfactory composer control: **Team: Auto / Off / Selected**. Selected
 implementers use BB's real provider/model/reasoning/service-tier picker and live
@@ -33,8 +46,8 @@ Explicit user instructions override the preference for a task. This is agent
 into an already running provider requires its next session start/resume to make
 the new tool available. There is no separate scheduler or worker progress UI.
 
-- `bb team get [--thread <id> | --project <id>] --json`
-- `bb team set --mode auto|off|selected [--profiles '<JSON array>'] [--revision <n>] [--thread <id> | --project <id>] --json`
+- `bb factory team get [--thread <id> | --project <id>] --json`
+- `bb factory team set --mode auto|off|selected [--profiles '<JSON array>'] [--revision <n>] [--thread <id> | --project <id>] --json`
 
 A profile has `providerId`, `model`, `reasoningLevel` and optional `serviceTier`.
 Omitting `--profiles` retains the saved list. Selected requires at least one

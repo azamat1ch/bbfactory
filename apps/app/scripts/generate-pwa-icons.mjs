@@ -161,6 +161,24 @@ async function writeOrCheck(fileName, content) {
   }
 }
 
+const factoryMark = await readFile(join(appDir, "../../assets/factory-logo.svg"), "utf8");
+for (const [fileName, size] of [
+  ["icon-192.png", 192], ["icon-512.png", 512],
+  ["icon-192-maskable.png", 192], ["icon-512-maskable.png", 512],
+  ["apple-touch-icon.png", 180],
+]) {
+  const mark = await sharp(Buffer.from(factoryMark)).resize(Math.round(size * 0.8)).png().toBuffer();
+  const tile = await sharp({ create: { width: size, height: size, channels: 4, background: "#ffffff" } })
+    .composite([{ input: mark, gravity: "centre" }]).png().toBuffer();
+  await writeOrCheck(fileName, tile);
+}
+for (const size of [16, 32]) {
+  for (const [suffix, color] of [["", "#25282c"], ["-dark", "#ffffff"], ["-dev", "#0090ff"]]) {
+    const mark = factoryMark.replaceAll("#25282c", color);
+    await writeOrCheck(`favicon-${size}x${size}${suffix}.png`, await sharp(Buffer.from(mark)).resize(size).png().toBuffer());
+  }
+}
+
 const baseManifest = JSON.parse(
   await readFile(join(publicDir, "manifest.webmanifest"), "utf8"),
 );

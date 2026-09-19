@@ -1,8 +1,23 @@
 # Native behavior parity map and port plan
 
-Status: **proposed mapping, no measured coverage**. Independent Astra source assessment, 2026-09-19. Base BB commit `223015a69992d6dfad9c5a9cdb5b2b4e40a21a48`; upstream Pragmatic Orchestration `061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5`. Both inspected worktrees were clean before this document. Concurrent implementation work is deliberately not counted. This document supplements, and does not change, [the specification](spec.md), [architecture](architecture.md), [acceptance gates](acceptance.md) or [135-row inventory](coverage.md).
+Status: **proposed mapping, no measured coverage**. Independent Astra source assessment, 2026-09-19. Base BB commit `223015a69992d6dfad9c5a9cdb5b2b4e40a21a48`; upstream Pragmatic Orchestration `061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5`. Both inspected worktrees were clean before this document. The source assessment below is historical; current implementation evidence is recorded in the addendum below. This document supplements, and does not change, [the specification](spec.md), [architecture](architecture.md), [acceptance gates](acceptance.md) or [135-row inventory](coverage.md).
 
-The primary delivery vehicle for the orchestration practices is an adapted **native BB skill bundle**: preserve upstream instructions, references and prompts nearly verbatim where compatible, and replace Porch calls with verified BB tools. Do not translate every instruction into TypeScript. Runtime work is limited to genuinely missing executable capabilities and invariants. The native foundation is a credible execution substrate, not near-complete orchestration. Reuse threads, providers and Workflows; add product contracts, supervision, review, inspection and resource policy around them. Workflows is not an already-public cross-plugin scheduler. Establish its supported integration seam before dependent implementation. No mandatory Porch runtime, second scheduler, fixed lead provider, fixed worker hierarchy or compulsory delegation is proposed.
+The primary delivery vehicle for the orchestration practices is an adapted **native BB skill bundle**: preserve upstream instructions, references and prompts nearly verbatim where compatible, and replace Porch calls with verified BB tools. Do not translate every instruction into TypeScript. Runtime work is limited to genuinely missing executable capabilities and invariants. The native foundation is a credible execution substrate, not near-complete orchestration. Reuse threads, providers and Workflows; add product contracts, supervision, review, inspection and resource policy around them. Workflows now provides the experimental discoverable execution seam described in [architecture](architecture.md). No mandatory Porch runtime, second scheduler, fixed lead provider, fixed worker hierarchy or compulsory delegation is proposed.
+
+## Integrated evidence update — September 20
+
+The single Factory bundle now includes the adapted skill, preserved prompts and
+review collector. Workflows Start/Inspect/Cancel/Guide, native settlement and
+canonical workspace ownership are implemented. Factory adds requirement-linked
+immutable evidence, host checks, freshness and human-judgment guards, plus compact
+UI. [Delivery-slice tests](first-slice.md) identify the concrete local evidence.
+The [port ledger](../../plugins/factory-guidance/PORT-COVERAGE.md) separates
+instruction and collector proof from native execution evidence.
+
+These implementations improve several historical A/N rows below without proving
+all their sub-behaviors. No row-level or 95% coverage claim follows. External
+history inspection/analytics, broader review-plan execution, real-provider
+end-to-end acceptance and the complete platform/recovery matrix remain pending.
 
 ## Dispositions and measurement proposal
 

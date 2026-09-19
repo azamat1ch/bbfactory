@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Native team preferences for bbfactory conversations.",
+  "description": "Factory: Team preferences, pragmatic guidance and requirement-linked checks.",
   "engines": {
     "bb": ">=0.0",
     "bbPluginSdk": ">=0.4.106"

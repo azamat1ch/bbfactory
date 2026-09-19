@@ -5,6 +5,9 @@ for what exists. Load [spec.md](docs/product/spec.md) for product decisions and
 [first-slice.md](docs/product/first-slice.md) for current implementation work;
 follow architecture, source inventory and package docs only as needed.
 
+- Factory is one installed plugin (`factory-team` is its compatibility ID), composed
+  from Team, guidance and task modules. Preserve the existing Team database ledger;
+  append task migrations. CLI: `bb factory`, `bb factory team`, `bb factory review`.
 - Reuse BB-native providers, threads, Workflows and plugin surfaces before adding
   another runtime. Porch is an optional development tool, not a required product
   dependency. Devin is one provider; no provider or model is the scheduler.
@@ -12,8 +15,8 @@ follow architecture, source inventory and package docs only as needed.
   scope, relevant context, frozen interfaces, checks and a handover/result format.
   Sol and Devin are peers; choose by suitability and availability.
 - Establish shared contracts before parallel work; isolate concurrent writers.
-  One integration owner verifies the combined result. Seek independent Astra
-  review for architecture and milestone acceptance, backed by source/test evidence.
+  One integration owner verifies the combined result. Use the designated integration owner as the review gate, backed by source/test
+  evidence; do not create extra review agents without explicit authorization.
 - Keep one canonical product contract. Update it when behavior changes. Do not
   copy the whole spec or transcripts into every worker brief. End-user projects
   retain their own documentation layout.

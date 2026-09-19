@@ -23,7 +23,10 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
     factoryResolveFinding: service.resolve,
     factoryRecordJudgment: service.judge,
   };
-  bb.rpc.register(factoryRpcContract, handlers);
+  bb.rpc.register(factoryRpcContract, handlers, {
+    experimental_discoverable: true,
+    experimental_description: "Versioned Factory tasks, native assignments and requirement-linked acceptance evidence.",
+  });
   const actions = {
     create: (input: unknown) =>
       handlers.factoryCreateTask(

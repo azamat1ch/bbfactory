@@ -4,11 +4,11 @@ description: Read or change the saved Team delegation preference and eligible im
 ---
 
 Read the current Team preference with `bb_team_get` before each new user task.
-For CLI access, use `bb team get --json`. In another scope pass
+For CLI access, use `bb factory team get --json`. In another scope pass
 `--thread <id>` or `--project <id>`; project scope is the default for new
 conversations, not an update to existing conversations.
 
-`bb team set --mode auto|off|selected --json` updates the saved preference.
+`bb factory team set --mode auto|off|selected --json` updates the saved preference.
 Selected mode requires profiles. Use `--profiles '<JSON array>'` with each
 profile containing `providerId`, `model`, `reasoningLevel`, and optional
 `serviceTier` (`default` or `fast`). Discover actual provider/model IDs through

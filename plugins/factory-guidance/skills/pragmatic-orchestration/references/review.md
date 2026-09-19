@@ -208,7 +208,7 @@ the run with `bb workflows status <run-id>` and `bb workflows history
 
 ### Composition contract (lead responsibility and helper support)
 
-There is no packaged reviewer-launch command. `bb review collect` processes
+There is no packaged reviewer-launch command. `bb factory review collect` processes
 already collected results and implements the union/provenance, quote checks,
 index coverage and degraded fallback below. The lead still supplies all requested
 passes and launches each native review/judge stage:

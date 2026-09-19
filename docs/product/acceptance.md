@@ -1,7 +1,8 @@
 # Acceptance and independent review
 
-These gates separate setup, implementation and product claims. The bootstrap
-has evidence; bbfactory runtime behaviors still need implementation and tests.
+These gates separate setup, implementation and product claims. The bootstrap and native delivery
+slices have local automated evidence; integrated real-provider delivery remains
+a separate gate. See [current status](README.md).
 
 | Gate | Required evidence |
 | --- | --- |

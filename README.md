@@ -8,9 +8,11 @@ agents, and inspect the result against agreed checks. The aim is more accepted
 work from the subscriptions you already have, including the cost of planning,
 communication, retries and review.
 
-**Current status:** the BB foundation builds and runs. The bbfactory execution
-policy, subscription-aware routing, verification and redesigned chat are
-specified but **not implemented**. The current preview is inherited BB.
+**Current status:** one bundled Factory feature combines the existing Team picker,
+Pragmatic guidance, native assignments and requirement-linked checks. Workflows
+owns delegated execution. Automated checks cover the individual runtime slices,
+UI and Team upgrade; real-provider end-to-end delivery and full upstream behavior
+parity remain acceptance work. See [status](docs/product/README.md).
 
 ## Run this checkout
 
@@ -53,7 +55,7 @@ bbfactory installer yet; `npx bb-app` and BB's downloads install upstream BB.
 - [First implementation slice](docs/product/first-slice.md)
 - [Contributor setup](CONTRIBUTING.md) and [agent instructions](AGENTS.md)
 
-The product will support a user-selected lead, interchangeable worker profiles,
+The product uses a user-selected lead, interchangeable worker profiles,
 visible subscription capacity and native task/check views. Codex, Claude Code,
 Cursor, Devin, OpenCode and GLM/Z.ai are the target integrations; their execution,
 usage reporting and account switching have separate readiness checks. Installing

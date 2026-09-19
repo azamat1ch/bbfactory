@@ -2267,8 +2267,8 @@ async function runDesktopApp(): Promise<void> {
   });
 
   const applicationName = app.isPackaged
-    ? DESKTOP_RELEASE_INFO.applicationName
-    : "bb-dev";
+    ? "bbfactory"
+    : "bbfactory-dev";
   app.setName(applicationName);
   installAboutPanel(applicationName);
 

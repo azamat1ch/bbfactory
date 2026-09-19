@@ -927,10 +927,11 @@ Modal image debugging: `bb modal image build [--json]` prepares the saved image;
 
 `bb plugin rpc call <plugin-id> <method> [--input-file <json-path>] [--json]` invokes a method using server-side schema validation. Omitting the input file sends JSON null. Input files avoid putting sensitive values in command arguments.
 
-## Factory Team
+## Factory
 
-The bundled bbfactory `factory-team` plugin adds Team Auto / Off / Selected to
-normal chat. Use `bb team get --json` and `bb team set --mode auto|off|selected
+The bundled Factory plugin keeps compatibility ID `factory-team` and combines
+Team preferences, Pragmatic guidance and task/check UI in one feature.
+Team Auto / Off / Selected appears in normal chat. Use `bb factory team get --json` and `bb factory team set --mode auto|off|selected
 [--profiles '<JSON array>'] [--revision <n>] --json`. Scope defaults to the current
 thread; pass `--thread <id>` or `--project <id>` for an explicit conversation or
 project default. A profile names `providerId`, `model`, `reasoningLevel` and
@@ -938,10 +939,18 @@ optional `serviceTier`. Each provider/model can appear once. Project defaults
 are snapshotted into new threads. This is delegation guidance; explicit task
 instructions override it. See the plugin's `team` skill for details.
 
+Tasks use `bb factory create|update|status|list|verify|assign|cancel|finding|resolve
+--input '<JSON>'`. The `bb_factory` tool uses the same action/input schemas.
+`judge` is UI/CLI only and needs explicit human confirmation plus the displayed
+spec version and content fingerprint; agents must never fabricate approval.
+All Factory RPCs, including Team get/set and collectReview, use `factory-team`.
+Use `bb plugin rpc inspect factory-team --json` for registered discoverable schemas.
+The former `bb team` CLI becomes `bb factory team`; saved preferences remain intact.
+
 Factory review collection
 -------------------------
 
-When Factory guidance is present, `bb review collect --input '<JSON>'` collects
+When Factory guidance is present, `bb factory review collect --input '<JSON>'` collects
 completed independent reviewer outputs. Input contains `passes` with unique
 `id`, `agent`, `role`, `output` and `error` (null for absent output/error), optional
 `sources` with `path`/`content`, and optional raw `judge` JSON text. The matching
@@ -953,6 +962,14 @@ validated judge results. An invalid judge retains the raw union as degraded.
 Exit 2 means partial roster or degraded judge; it does not discard good outputs.
 Attribution and snapshot freshness are caller-supplied; collection is not Factory
 task acceptance. See the Pragmatic Orchestration skill for native review plans.
+
+## Subscription limits
+
+Provider Usage remains a separate native plugin. `bb usage limits [--force]
+[--json]`, `bb_usage_limits`, and discoverable `provider-usage` RPC `readLimits`
+return normalized capacity observations with account/pool identity, timestamps
+and stale/unknown states. Supported account fallback is configured in Account
+Pooler; reading a limit does not prove fallback or choose a replacement model.
 
 ## Native Workflows assignments
 

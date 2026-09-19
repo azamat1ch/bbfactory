@@ -1,4 +1,6 @@
-# Factory
+# Factory task module
+
+This internal module is composed into the single [Factory plugin](../factory-team/README.md). Do not install it as a second plugin.
 
 Factory persists versioned requirements, optional behavioral scenarios, links to actual project tests, immutable check evidence, native assignment associations, review findings and explicit human judgments. Workflows owns delegated execution. Factory does not schedule, spawn, retry or stop threads itself.
 
@@ -8,7 +10,7 @@ Direct work needs a task and final verification; no delegated worker is required
 
 The `bb_factory` tool accepts `{action, input}`. Actions are `create`, `update`, `status`, `list`, `verify`, `assign`, `cancel`, `finding`, and `resolve`. Input follows the corresponding RPC schema in [src/shared.ts](src/shared.ts). Human judgment is deliberately absent from the agent tool.
 
-SDK consumers use `sdk.plugins.callRpc({pluginId: "bbfactory", method, input, outputSchema})` with `factoryRpcContract`. Delegation uses the public Workflows experimental execution RPC; Team preferences use the existing `factory-team` RPC. Both dependencies must be installed and enabled for delegation. Direct task verification does not require Workflows.
+SDK consumers use `sdk.plugins.callRpc({pluginId: "factory-team", method, input, outputSchema})` with `factoryRpcContract`. Delegation uses the public Workflows experimental execution RPC; Team preferences use the existing `factory-team` RPC. Factory and Workflows must be enabled for delegation. Direct task verification does not require Workflows.
 
 The CLI exposes the same records through `bb factory <action> --input '<JSON>'`, plus `judge` for an explicitly authorized human attestation. `judge` requires `humanConfirmed:true`, actor, requirement ID, accepted boolean, rationale, expectedVersion and expectedFingerprint from the displayed task. Changed content or specification rejects the attestation rather than silently applying it to a new result. These are user attestations, not cryptographic provenance: an API credential holder can submit one. Agents must never invent human authorization.
 

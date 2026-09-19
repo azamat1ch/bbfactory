@@ -1,58 +1,34 @@
-# Next implementation slice
+# Native delivery slice
 
-Status: revised plan after reassessing draft PR #6 against native BB/Workflows.
-The old one-worker slice is not a product restriction. Follow the recommended
-[ownership boundary](architecture.md) before extending its implementation.
+The delivery slice is implemented in native Workflows and one composed Factory
+plugin. It is not a one-worker restriction. Direct work, shared read-only review
+and isolated concurrent implementers are valid choices.
 
-## Prove native execution integration first
+## Local evidence
 
-Add the smallest typed Workflows interface over its existing service, per-call
-native environment/access selection, and truthful native stop/replace handling.
-Factory keeps task/assignment associations and acceptance, not a second scheduler.
-
-Build an offline fake-provider integration scenario that exercises:
-
-| Situation | Expected result |
+| Boundary | Executable evidence |
 | --- | --- |
-| Lead delegates two bounded assignments | Ordinary native subagents use selected profiles and expose native progress |
-| Review/research shares a checkout | Sharing works with the chosen access policy; no mandatory worktree |
-| Two implementers write concurrently | Coordinated scopes/environments prevent competing writes; worktrees are one option |
-| Spawn reply is lost, then the plugin restarts | Reconcile durable native ownership; never blindly launch a duplicate |
-| Stop acknowledgement fails, then retry is requested | Preserve partial work and uncertainty; no overlapping replacement writer |
-| One parallel call fails | Preserve its attributed failure; a null result is not successful delivery |
+| Durable execution identity, environment choice and conservative stop | [Workflows policy tests](../../plugins/workflows/src/service-policy.test.ts), [execution contract tests](../../plugins/workflows/src/execution.test.ts) |
+| Versioned requirements, linked evidence, stale/restart/stop handling and human guards | [Factory service tests](../../plugins/bbfactory/src/service.test.ts) |
+| Real checks, descendant containment and unsupported capture | [Factory host tests](../../plugins/bbfactory/src/host.test.ts) |
+| Task details, uncertainty and human judgment UI | [Task UI tests](../../plugins/bbfactory/src/app.test.tsx) |
+| Existing Team upgrade, composed tools/skills and CLI | [Composition test](../../plugins/factory-team/factory-server.test.ts), [Team tests](../../plugins/factory-team/server.test.ts) |
+| Guidance links/preserved prompts and review collector | [Bundle tests](../../plugins/factory-guidance/bundle.test.ts), [collector tests](../../plugins/factory-guidance/review.test.ts) |
 
-These are tests to build, not claims of passing behavior. Thread settlement
-must not be confused with a stronger process/write guarantee.
+Run relevant tests/typechecks with Turbo. Build `bb-plugin-factory-team`'s
+`prepare:bundled` task to verify the composed server, host, UI and staged skills.
+These checks use local fixtures and actual SQLite or host processes where
+applicable; provider execution itself still needs account-specific proof.
 
-## Connect the product
+## Remaining acceptance
 
-After proving the boundary, integrate bounded work in these lanes:
+Complete a real feature through the running app: agree requirements, implement
+directly or delegate, review, correct findings, and verify the final integrated
+content. Exercise restart and uncertain stop through the same runtime. A canned
+fixture or static UI inspection does not establish that whole route.
 
-1. **Guidance and Team.** Finish adapted Pragmatic guidance and consume the
-   existing Team record for actual assignments. Preserve direct work, chosen
-   models, explicit overrides and concise contextual briefs.
-2. **Requirements and evidence.** Extend retained PR #6 records with explicit
-   requirement/check links and review findings. Correct host verification
-   defects and check final integrated content.
-3. **Compact UI.** Reuse the Team picker and task/check card. UI, tools and CLI
-   read the same records; do not add another dashboard.
-4. **Real app proof.** Complete a requested feature through the app, including
-   implementation, review, correction and independent verification. A canned
-   delivery fixture does not substitute for building the demonstration in-app.
-
-Acceptance examples:
-
-- Direct and delegated work use the same acceptance checks; direct work does
-  not need ceremonial extra agents or a workflow.
-- A required behavior without a linked check stays unverified unless an
-  explicit human-review criterion applies.
-- Worker completion plus a failing required check leaves the task unaccepted.
-- Changed requirements, checks or relevant files invalidate affected evidence.
-- Research, review and implementation use the same subagent mechanism;
-  unresolved required review findings block acceptance.
-- Reconnect/restart restores durable records, not model-written status text.
-
-Continue the [Pragmatic parity map](parity-map.md), including deeper review plans,
-supervision, context/session handling and recovery. Keep limits inspectable and
-configure supported account pooling. There is no quota-optimizer milestone.
-Branding, package consolidation and fresh-setup verification complete the experience.
+Then assess the [parity map](parity-map.md) behavior by behavior. External session
+history readers/analytics, broader review-plan orchestration and the full
+provider/platform supervision/recovery matrix remain gaps. Preserved prompts and
+135 mapped IDs do not prove behavioral equivalence. Keep evidence and unresolved
+requirements visible instead of reporting a percentage from source counts.

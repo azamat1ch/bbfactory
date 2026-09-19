@@ -13,7 +13,7 @@ tests).
 ## Offline checks for this bundle
 
 - Package manifest and bundled output:
-  `pnpm exec turbo run prepare:bundled --filter=bb-plugin-factory-guidance`
+  `pnpm exec turbo run prepare:bundled --filter=bb-plugin-factory-team`
   (validates `package.json` `bb` metadata and produces `.bundled-runtime`).
 - Skill frontmatter and discovery: the server validates `name`/`description`
   frontmatter and requires the directory name to match `name`.
@@ -40,7 +40,7 @@ separate from the offline suite. When running it:
 
 ## Executed collector and asset tests
 
-Run `pnpm exec turbo run test typecheck prepare:bundled --filter=bb-plugin-factory-guidance`.
+Run `pnpm exec turbo run test typecheck prepare:bundled --filter=bb-plugin-factory-team`.
 `review.test.ts` covers attributed partial failures, empty versus zero findings,
 quote mismatches, malformed/incomplete/duplicate judge indices, provenance and
 summary mismatches, semantic-judge duplicate pointers, severity downgrade and

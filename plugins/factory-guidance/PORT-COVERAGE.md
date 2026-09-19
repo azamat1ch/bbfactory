@@ -15,6 +15,25 @@ The source scripts, backend launchers, supervisor, mailbox, credential handling,
 transport adapters and remote-host provisioning are not shipped. Native execution
 belongs to BB/Workflows; external session-store readers remain a real gap.
 
+## Integrated native evidence — September 20
+
+The composed Factory distribution now ships Workflows' experimental execution
+Start/Inspect/Cancel/Guide and native settlement, plus canonical workspace locks
+and isolated concurrent worktrees. See [policy tests](../workflows/src/service-policy.test.ts)
+and [execution tests](../workflows/src/execution.test.ts). Factory
+[service tests](../bbfactory/src/service.test.ts) and
+[host tests](../bbfactory/src/host.test.ts) cover requirement-linked evidence,
+freshness, cancellation uncertainty, human guards and real check containment.
+[Composition tests](../factory-team/factory-server.test.ts) preserve existing
+Team data while enabling all guidance/task tools and skills.
+
+“Native pending” in the original rows below means complete row equivalence is
+still pending; it does not mean these native primitives are absent. An entire
+row needs its full negative-case and applicable provider/platform evidence.
+External session-store adapters and analytics remain unimplemented; integrated
+real-provider feature delivery and broader review/supervision parity remain
+acceptance work. No inventory percentage is claimed.
+
 | Source ID | Instruction evidence | Local test evidence | Native status |
 | --- | --- | --- | --- |
 | RUN-01 | [native adaptation / limitations](skills/pragmatic-orchestration/references/runtime-contracts.md) | — | Native pending; not credited as complete |
