@@ -75,6 +75,11 @@ export function createStore(db: Database.Database) {
         "INSERT INTO factory_stop_intents(task_id, archived) VALUES (?, ?) ON CONFLICT(task_id) DO UPDATE SET archived = MAX(archived, excluded.archived)",
       ).run(taskId, archived ? 1 : 0);
     },
+    clearStop(taskId: string) {
+      db.prepare("DELETE FROM factory_stop_intents WHERE task_id = ?").run(
+        taskId,
+      );
+    },
     stopped(taskId: string) {
       return db
         .prepare("SELECT archived FROM factory_stop_intents WHERE task_id = ?")

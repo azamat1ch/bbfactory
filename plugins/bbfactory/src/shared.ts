@@ -9,6 +9,14 @@ export const requirementSchema = z.strictObject({
   id,
   text: z.string().min(1),
   criterion: z.enum(["automated", "agent", "human"]),
+  verificationMethods: z
+    .array(z.enum(["automated", "agent", "human"]))
+    .max(3)
+    .refine(
+      (methods) => new Set(methods).size === methods.length,
+      "Verification methods must be unique",
+    )
+    .default([]),
   reviewInstructions: z.string().default(""),
   artifactRefs: z.array(z.string()).default([]),
 });
@@ -151,7 +159,7 @@ export const judgmentSchema = z.strictObject({
   fingerprint: id,
   accepted: z.boolean(),
   actor: z.string().min(1),
-  rationale: z.string().min(1),
+  rationale: z.string(),
   createdAt: z.number(),
 });
 export const reviewSchema = z.strictObject({
@@ -196,11 +204,54 @@ export const taskViewSchema = z.strictObject({
   statusDetail: z.string(),
   archived: z.boolean(),
   stopRequested: z.boolean(),
+  executionRunning: z.boolean().default(false),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
+export function verificationMethods(
+  requirement: z.infer<typeof requirementSchema>,
+) {
+  return requirement.verificationMethods.length
+    ? requirement.verificationMethods
+    : [requirement.criterion];
+}
+const approvalFields = {
+  scope: z.enum(["delivery", "selected"]),
+  requirementIds: z.array(id),
+  accepted: z.boolean(),
+  actor: id,
+  source: z.enum(["ui", "cli", "chat"]).default("ui"),
+  sourceRef: z.string().min(1).nullable().default(null),
+  rationale: z.string().default(""),
+};
+export const approvalSchema = z.strictObject({
+  id,
+  taskId: id,
+  specVersion: z.number().int(),
+  fingerprint: id,
+  ...approvalFields,
+  createdAt: z.number(),
+});
+export const deliverySchema = z.strictObject({
+  id,
+  taskId: id,
+  specVersion: z.number().int(),
+  content: contentSchema,
+  mergeUrl: z.string().url().nullable(),
+  status: z.literal("delivered"),
+  verificationStatus: z.enum(["accepted", "failed", "unverified", "stale"]),
+  createdAt: z.number(),
+});
+export const specBundleSchema = z.strictObject({
+  format: z.literal("factory-spec"),
+  formatVersion: z.literal(1),
+  spec: specSchema,
+});
 export const taskDetailSchema = z.strictObject({
   observedContent: contentSchema.nullable().default(null),
+  invalidatedEvidenceIds: z.array(id).default([]),
+  approvals: z.array(approvalSchema).default([]),
+  deliveries: z.array(deliverySchema).default([]),
   task: taskViewSchema,
   assignments: z.array(assignmentSchema),
   evidence: z.array(evidenceSchema),
@@ -219,6 +270,40 @@ export const taskDetailSchema = z.strictObject({
 });
 const taskIdInput = z.strictObject({ taskId: id });
 export const factoryRpcContract = defineRpcContract({
+  factoryApproveDelivery: {
+    input: z.strictObject({
+      taskId: id,
+      expectedVersion: z.number().int().positive(),
+      expectedFingerprint: id,
+      humanConfirmed: z.literal(true),
+      ...approvalFields,
+    }),
+    output: taskDetailSchema,
+  },
+  factoryRecordDelivery: {
+    input: z.strictObject({
+      taskId: id,
+      expectedVersion: z.number().int().positive(),
+      expectedFingerprint: id,
+      mergeUrl: z.string().url().nullable().default(null),
+    }),
+    output: taskDetailSchema,
+  },
+  factoryResumeTask: {
+    input: z.strictObject({
+      taskId: id,
+      expectedVersion: z.number().int().positive(),
+    }),
+    output: taskDetailSchema,
+  },
+  factoryExportSpec: { input: taskIdInput, output: specBundleSchema },
+  factoryImportSpec: {
+    input: z.strictObject({ threadId: id, bundle: specBundleSchema }),
+    output: z.strictObject({
+      task: taskViewSchema,
+      previewDirective: z.string(),
+    }),
+  },
   factoryListTasks: {
     input: z.strictObject({ threadId: id }),
     output: z.strictObject({ tasks: z.array(taskViewSchema) }),
@@ -284,7 +369,7 @@ export const factoryRpcContract = defineRpcContract({
       requirementId: id,
       accepted: z.boolean(),
       actor: z.string().min(1),
-      rationale: z.string().min(1),
+      rationale: z.string(),
       humanConfirmed: z.literal(true),
       expectedVersion: z.number().int().positive(),
       expectedFingerprint: id,

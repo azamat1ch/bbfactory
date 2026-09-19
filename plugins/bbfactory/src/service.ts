@@ -5,6 +5,7 @@ import { teamRpcContract } from "../../factory-team/shared.js";
 import { workflowExecutionRpcContract } from "../../workflows/src/execution-contract.js";
 import { createStore, migrations } from "./data.js";
 import {
+  verificationMethods,
   factoryHostContract,
   factoryRpcContract,
   FACTORY_TASKS_REALTIME_CHANNEL,
@@ -48,12 +49,15 @@ export function createFactoryService(
     }
   }
   function save(detail: FactoryTaskDetail) {
+    detail.task.executionRunning =
+      checks.has(detail.task.id) ||
+      detail.assignments.some(
+        (a) => !["succeeded", "failed"].includes(a.nativeStatus),
+      );
     const stop = store.stopped(detail.task.id);
     if (stop !== undefined) {
       detail.task.stopRequested = true;
       detail.task.archived ||= stop === 1;
-      detail.task.status = "unverified";
-      detail.task.statusDetail = "Durable stop intent suspends acceptance";
     }
     let previous: FactoryTaskDetail | null = null;
     try {
@@ -183,7 +187,27 @@ export function createFactoryService(
   }
 
   function evaluate(detail: FactoryTaskDetail, state: FactoryContent) {
+    if (
+      state.complete &&
+      detail.observedContent?.complete &&
+      (state.fingerprint !== detail.observedContent.fingerprint ||
+        state.canonicalPath !== detail.observedContent.canonicalPath)
+    ) {
+      detail.invalidatedEvidenceIds = [
+        ...new Set([
+          ...detail.invalidatedEvidenceIds,
+          ...detail.evidence.map((e) => e.id),
+          ...detail.judgments.map((j) => j.id),
+          ...detail.reviews.map((r) => r.id),
+        ]),
+      ];
+    }
     detail.observedContent = state;
+    detail.task.executionRunning =
+      checks.has(detail.task.id) ||
+      detail.assignments.some(
+        (a) => !["succeeded", "failed"].includes(a.nativeStatus),
+      );
     const task = detail.task;
     const fail = (status: typeof task.status, text: string) => {
       task.status = status;
@@ -191,8 +215,7 @@ export function createFactoryService(
     };
     if (task.phase === "draft")
       return fail("unverified", "Draft task must be started before acceptance");
-    if (task.stopRequested || task.archived)
-      return fail("unverified", "Stop requested; acceptance is suspended");
+
     if (store.verifying(task.id))
       return fail(
         "unverified",
@@ -210,6 +233,7 @@ export function createFactoryService(
       return fail("failed", "Required review findings remain unresolved");
     const current = detail.evidence.filter(
       (e) =>
+        !detail.invalidatedEvidenceIds.includes(e.id) &&
         e.specVersion === task.specVersion &&
         e.content.fingerprint === state.fingerprint &&
         e.content.canonicalPath === state.canonicalPath,
@@ -230,50 +254,54 @@ export function createFactoryService(
       }
     }
     for (const requirement of task.requirements) {
-      if (requirement.criterion === "human") {
-        const judgment = detail.judgments
-          .filter(
-            (j) =>
-              j.requirementId === requirement.id &&
-              j.specVersion === task.specVersion &&
-              j.fingerprint === state.fingerprint,
+      for (const method of verificationMethods(requirement)) {
+        if (method === "human") {
+          const judgment = detail.judgments
+            .filter(
+              (j) =>
+                !detail.invalidatedEvidenceIds.includes(j.id) &&
+                j.requirementId === requirement.id &&
+                j.specVersion === task.specVersion &&
+                j.fingerprint === state.fingerprint,
+            )
+            .at(-1);
+          if (judgment && !judgment.accepted)
+            return fail("failed", `Human judgment rejected ${requirement.id}`);
+          if (!judgment) {
+            missing = true;
+            stale ||= detail.judgments.some(
+              (j) => j.requirementId === requirement.id,
+            );
+          }
+        } else if (method === "agent") {
+          const review = detail.reviews
+            .filter(
+              (review) =>
+                !detail.invalidatedEvidenceIds.includes(review.id) &&
+                review.requirementIds.includes(requirement.id) &&
+                review.specVersion === task.specVersion &&
+                review.fingerprint === state.fingerprint,
+            )
+            .at(-1);
+          if (review && !review.accepted)
+            return fail("failed", `Agent review rejected ${requirement.id}`);
+          if (!review) {
+            missing = true;
+            stale ||= detail.reviews.some((review) =>
+              review.requirementIds.includes(requirement.id),
+            );
+          }
+        } else if (
+          !task.checks.some(
+            (c) =>
+              c.required &&
+              c.requirementIds.includes(requirement.id) &&
+              current.filter((e) => e.check.id === c.id).at(-1)?.outcome ===
+                "passed",
           )
-          .at(-1);
-        if (judgment && !judgment.accepted)
-          return fail("failed", `Human judgment rejected ${requirement.id}`);
-        if (!judgment) {
-          missing = true;
-          stale ||= detail.judgments.some(
-            (j) => j.requirementId === requirement.id,
-          );
-        }
-      } else if (requirement.criterion === "agent") {
-        const review = detail.reviews
-          .filter(
-            (review) =>
-              review.requirementIds.includes(requirement.id) &&
-              review.specVersion === task.specVersion &&
-              review.fingerprint === state.fingerprint,
-          )
-          .at(-1);
-        if (review && !review.accepted)
-          return fail("failed", `Agent review rejected ${requirement.id}`);
-        if (!review) {
-          missing = true;
-          stale ||= detail.reviews.some((review) =>
-            review.requirementIds.includes(requirement.id),
-          );
-        }
-      } else if (
-        !task.checks.some(
-          (c) =>
-            c.required &&
-            c.requirementIds.includes(requirement.id) &&
-            current.filter((e) => e.check.id === c.id).at(-1)?.outcome ===
-              "passed",
         )
-      )
-        missing = true;
+          missing = true;
+      }
     }
     if (missing)
       return fail(
@@ -316,14 +344,16 @@ export function createFactoryService(
         (id) =>
           !detail.task.requirements.some(
             (requirement) =>
-              requirement.id === id && requirement.criterion === "human",
+              requirement.id === id &&
+              verificationMethods(requirement).includes("human"),
           ),
       )
     )
       throw new Error("All selected requirements must be human criteria");
-    if (!input.accepted && !input.rationale.trim())
-      throw new Error("Rejected human judgments require rationale");
+
     const state = await content(detail.task.environmentId);
+    evaluate(detail, state);
+    save(detail);
     if (!state.complete) throw new Error("Cannot judge unknown content");
     if (
       input.expectedVersion !== detail.task.specVersion ||
@@ -333,8 +363,7 @@ export function createFactoryService(
         "The specification or content changed since review; reload before judging",
       );
     const now = Date.now();
-    const rationale =
-      input.rationale.trim() || "Accepted reviewed requirements";
+    const rationale = input.rationale;
     const judgments = input.requirementIds.map((requirementId) => ({
       id: randomUUID(),
       taskId: input.taskId,
@@ -355,7 +384,163 @@ export function createFactoryService(
     })();
     return detail;
   }
+  async function reviewedState(
+    detail: FactoryTaskDetail,
+    input: { expectedVersion: number; expectedFingerprint: string },
+  ) {
+    if (detail.task.phase !== "active" || detail.task.archived)
+      throw new Error("Delivery decisions require an active task");
+    const state = await content(detail.task.environmentId);
+    evaluate(detail, state);
+    if (
+      !state.complete ||
+      input.expectedVersion !== detail.task.specVersion ||
+      input.expectedFingerprint !== state.fingerprint
+    ) {
+      save(detail);
+      throw new Error(
+        "The specification or content changed since review; reload before recording",
+      );
+    }
+    return state;
+  }
   const service = {
+    exportSpec(input: Input<"factoryExportSpec">) {
+      input = factoryRpcContract.factoryExportSpec.input.parse(input);
+      const detail = store.get(input.taskId);
+      return factoryRpcContract.factoryExportSpec.output.parse({
+        format: "factory-spec",
+        formatVersion: 1,
+        spec: detail.specs.find((s) => s.version === detail.task.specVersion)!
+          .spec,
+      });
+    },
+    importSpec(
+      input: Input<"factoryImportSpec">,
+    ): Promise<z.infer<typeof factoryRpcContract.factoryImportSpec.output>> {
+      input = factoryRpcContract.factoryImportSpec.input.parse(input);
+      return service.createTask({
+        threadId: input.threadId,
+        spec: input.bundle.spec,
+      });
+    },
+    resumeTask(input: Input<"factoryResumeTask">) {
+      input = factoryRpcContract.factoryResumeTask.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        if (detail.task.specVersion !== input.expectedVersion)
+          throw new Error("Specification changed; reload before resuming");
+        if (detail.task.archived)
+          throw new Error("Archived tasks cannot resume");
+        await native(detail, false);
+        if (
+          checks.has(input.taskId) ||
+          detail.assignments.some(
+            (a) => !["succeeded", "failed"].includes(a.nativeStatus),
+          )
+        )
+          throw new Error("Execution must settle before resuming");
+        store.clearStop(input.taskId);
+        store.finishVerification(input.taskId);
+        detail.task.stopRequested = false;
+        evaluate(detail, await content(detail.task.environmentId));
+        save(detail);
+        return detail;
+      });
+    },
+    recordDelivery(input: Input<"factoryRecordDelivery">) {
+      input = factoryRpcContract.factoryRecordDelivery.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        const state = await reviewedState(detail, input);
+        const delivery = {
+          id: randomUUID(),
+          taskId: input.taskId,
+          specVersion: detail.task.specVersion,
+          content: state,
+          mergeUrl: input.mergeUrl,
+          status: "delivered" as const,
+          verificationStatus: detail.task.status,
+          createdAt: Date.now(),
+        };
+        detail.deliveries.push(delivery);
+        db.transaction(() => {
+          store.artifact(delivery.id, input.taskId, "delivery", delivery);
+          save(detail);
+        })();
+        return detail;
+      });
+    },
+    approveDelivery(input: Input<"factoryApproveDelivery">) {
+      input = factoryRpcContract.factoryApproveDelivery.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        if (input.source === "chat" && !input.sourceRef)
+          throw new Error("Chat decisions require a source reference");
+        const requirementIds =
+          input.scope === "delivery"
+            ? detail.task.requirements.map((r) => r.id)
+            : input.requirementIds;
+        if (input.scope === "delivery" && input.requirementIds.length)
+          throw new Error("Whole delivery scope requires empty requirementIds");
+        if (
+          !requirementIds.length ||
+          new Set(requirementIds).size !== requirementIds.length ||
+          requirementIds.some(
+            (id) => !detail.task.requirements.some((r) => r.id === id),
+          )
+        )
+          throw new Error("Select unique known requirements");
+        const state = await reviewedState(detail, input);
+        const approval = {
+          id: randomUUID(),
+          taskId: input.taskId,
+          specVersion: detail.task.specVersion,
+          fingerprint: state.fingerprint,
+          scope: input.scope,
+          requirementIds,
+          accepted: input.accepted,
+          actor: input.actor,
+          source: input.source,
+          sourceRef: input.sourceRef,
+          rationale: input.rationale,
+          createdAt: Date.now(),
+        };
+        const judgments = detail.task.requirements
+          .filter(
+            (r) =>
+              requirementIds.includes(r.id) &&
+              verificationMethods(r).includes("human"),
+          )
+          .map((r) => ({
+            id: randomUUID(),
+            taskId: input.taskId,
+            requirementId: r.id,
+            specVersion: detail.task.specVersion,
+            fingerprint: state.fingerprint,
+            accepted: input.accepted,
+            actor: input.actor,
+            rationale: input.rationale,
+            createdAt: approval.createdAt,
+          }));
+        detail.approvals.push(approval);
+        detail.judgments.push(...judgments);
+        evaluate(detail, state);
+        db.transaction(() => {
+          store.artifact(approval.id, input.taskId, "approval", approval);
+          for (const judgment of judgments)
+            store.artifact(
+              judgment.id,
+              input.taskId,
+              "human-judgment",
+              judgment,
+            );
+          save(detail);
+        })();
+        return detail;
+      });
+    },
+
     async createTask(input: Input<"factoryCreateTask">) {
       input = factoryRpcContract.factoryCreateTask.input.parse(input);
       const thread = await bb.sdk.threads.get({ threadId: input.threadId });
@@ -365,6 +550,9 @@ export function createFactoryService(
       const taskId = `bft_${randomUUID()}`;
       const detail: FactoryTaskDetail = {
         observedContent: null,
+        invalidatedEvidenceIds: [],
+        approvals: [],
+        deliveries: [],
         task: {
           id: taskId,
           projectId: thread.projectId,
@@ -377,6 +565,7 @@ export function createFactoryService(
           statusDetail: "No acceptance evidence",
           archived: false,
           stopRequested: false,
+          executionRunning: false,
           createdAt: now,
           updatedAt: now,
         },
@@ -405,6 +594,7 @@ export function createFactoryService(
       };
     },
     getTaskDetail(taskId: string) {
+      if (checks.has(taskId)) return Promise.resolve(store.get(taskId));
       return locked(taskId, () => refresh(taskId));
     },
     async listTasks(threadId: string) {
@@ -413,9 +603,10 @@ export function createFactoryService(
         store
           .list(threadId)
           .map((d) =>
-            locked(d.task.id, () => refresh(d.task.id, captures)).then(
-              (d) => d.task,
-            ),
+            (checks.has(d.task.id)
+              ? Promise.resolve(store.get(d.task.id))
+              : locked(d.task.id, () => refresh(d.task.id, captures))
+            ).then((d) => d.task),
           ),
       );
     },
@@ -464,6 +655,18 @@ export function createFactoryService(
         if (detail.task.stopRequested || detail.task.archived)
           throw new Error("Stopped or archived tasks cannot be started");
         if (detail.task.phase === "active") return detail;
+        const gaps = detail.task.requirements.filter(
+          (r) =>
+            !r.reviewInstructions.trim() &&
+            verificationMethods(r).includes("automated") &&
+            !detail.task.checks.some(
+              (c) => c.required && c.requirementIds.includes(r.id),
+            ),
+        );
+        if (gaps.length)
+          throw new Error(
+            `Requirements need a usable verification route: ${gaps.map((r) => r.id).join(", ")}`,
+          );
         detail.task.phase = "active";
         evaluate(detail, await content(detail.task.environmentId));
         save(detail);
@@ -489,15 +692,16 @@ export function createFactoryService(
         store.beginVerification(taskId);
         detail.task.status = "unverified";
         detail.task.statusDetail = "Independent verification in progress";
-        save(detail);
         const controller = new AbortController();
         checks.set(taskId, controller);
+        save(detail);
         const before = await content(detail.task.environmentId);
+        evaluate(detail, before);
         if (!before.complete) {
-          evaluate(detail, before);
-          save(detail);
           store.finishVerification(taskId);
           checks.delete(taskId);
+          evaluate(detail, before);
+          save(detail);
           return detail;
         }
         for (const check of detail.task.checks) {
@@ -737,18 +941,26 @@ export function createFactoryService(
       );
     },
     cancelTask(input: Input<"factoryCancelTask">) {
-      store.get(input.taskId);
+      input = factoryRpcContract.factoryCancelTask.input.parse(input);
+      const current = store.get(input.taskId);
+      if (
+        !input.archive &&
+        !checks.has(input.taskId) &&
+        !current.assignments.some(
+          (a) => !["succeeded", "failed"].includes(a.nativeStatus),
+        )
+      )
+        throw new Error("Only running execution can be cancelled");
       store.requestStop(input.taskId, input.archive);
       checks.get(input.taskId)?.abort();
       return locked(input.taskId, async () => {
         const detail = store.get(input.taskId);
         detail.task.stopRequested = true;
         detail.task.archived ||= input.archive;
-        detail.task.status = "unverified";
-        detail.task.statusDetail =
-          "Durable stop requested; native cancellation pending";
+
         save(detail);
         await native(detail, true);
+        evaluate(detail, await content(detail.task.environmentId));
         save(detail);
         return detail;
       });
@@ -829,12 +1041,15 @@ export function createFactoryService(
             (id) =>
               !detail.task.requirements.some(
                 (requirement) =>
-                  requirement.id === id && requirement.criterion === "agent",
+                  requirement.id === id &&
+                  verificationMethods(requirement).includes("agent"),
               ),
           )
         )
           throw new Error("All selected requirements must be agent criteria");
         const state = await content(detail.task.environmentId);
+        evaluate(detail, state);
+        save(detail);
         if (!state.complete) throw new Error("Cannot review unknown content");
         const { expectedVersion, expectedFingerprint, ...record } = input;
         if (

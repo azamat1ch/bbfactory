@@ -323,6 +323,176 @@ const assignment = (id: string, environmentId = "env") => ({
 });
 
 describe("Factory acceptance against real SQLite migrations", () => {
+  it("requires every selected verification method and keeps approval separate from checks", async () => {
+    const f = fixture();
+    const { task } = await f.create(
+      specSchema.parse({
+        ...spec,
+        requirements: [
+          {
+            ...spec.requirements[0],
+            verificationMethods: ["automated", "agent", "human"],
+          },
+        ],
+      }),
+    );
+    expect((await f.service.verifyTask(task.id)).task.status).toBe(
+      "unverified",
+    );
+    await f.service.review({
+      taskId: task.id,
+      requirementIds: ["R1"],
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      reviewer: "lead",
+      summary: "Inspected concurrency behavior",
+      limitations: "",
+      artifactRefs: ["booking.test.ts"],
+      accepted: true,
+    });
+    const approval = {
+      taskId: task.id,
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      scope: "selected" as const,
+      requirementIds: ["R1"],
+      accepted: true,
+      actor: "user",
+      humanConfirmed: true as const,
+      source: "chat" as const,
+      sourceRef: "thread/message-1",
+      rationale: "",
+    };
+    const approved = await f.service.approveDelivery(approval);
+    expect(approved.task.status).toBe("accepted");
+    expect(approved.approvals[0]).toMatchObject({
+      source: "chat",
+      sourceRef: "thread/message-1",
+      rationale: "",
+      requirementIds: ["R1"],
+    });
+    f.fail();
+    expect((await f.service.verifyTask(task.id)).task.status).toBe("failed");
+    expect((await f.service.getTaskDetail(task.id)).approvals).toHaveLength(1);
+    await expect(
+      f.service.approveDelivery({ ...approval, sourceRef: null }),
+    ).rejects.toThrow("source reference");
+    await expect(
+      f.service.approveDelivery({ ...approval, expectedVersion: 2 }),
+    ).rejects.toThrow("changed");
+  });
+
+  it("preserves delivery history and does not revive evidence after observed content changes away and back", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    await f.service.verifyTask(task.id);
+    await f.service.recordDelivery({
+      taskId: task.id,
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      mergeUrl: "https://example.com/pr/1",
+    });
+    f.setFingerprint("content-v2");
+    await f.service.getTaskDetail(task.id);
+    f.setFingerprint("content-v1");
+    const restored = await f.service.getTaskDetail(task.id);
+    expect(restored.task.status).toBe("stale");
+    expect(restored.deliveries[0]).toMatchObject({
+      status: "delivered",
+      verificationStatus: "accepted",
+      specVersion: 1,
+    });
+    expect((await f.service.verifyTask(task.id)).task.status).toBe("accepted");
+    const imported = await f.service.importSpec({
+      threadId: "thread",
+      bundle: f.service.exportSpec({ taskId: task.id }),
+    });
+    const copy = await f.service.getTaskDetail(imported.task.id);
+    expect(copy.task.phase).toBe("draft");
+    expect(copy.task.status).toBe("unverified");
+    expect(copy.evidence).toEqual([]);
+    expect(copy.deliveries).toEqual([]);
+    expect(copy.approvals).toEqual([]);
+    expect(copy.task.requirements).toEqual(restored.task.requirements);
+  });
+
+  it("rejects idle cancellation and resumes legacy stops without launching or invalidating evidence", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    await f.service.verifyTask(task.id);
+    expect(() =>
+      f.service.cancelTask({ taskId: task.id, archive: false }),
+    ).toThrow("running");
+    createStore(f.connection.$client).requestStop(task.id, false);
+    expect((await f.service.getTaskDetail(task.id)).task.status).toBe(
+      "accepted",
+    );
+    const resumed = await f.service.resumeTask({
+      taskId: task.id,
+      expectedVersion: 1,
+    });
+    expect(resumed.task.stopRequested).toBe(false);
+    expect(resumed.task.status).toBe("accepted");
+    expect(f.starts).toBe(0);
+  });
+
+  it("records exactly selected approval scope and validates planned verification routes", async () => {
+    const f = fixture();
+    const planned = specSchema.parse({
+      ...spec,
+      checks: [],
+      requirements: [
+        {
+          id: "A",
+          text: "Backend behavior",
+          criterion: "automated",
+          reviewInstructions:
+            "Implement a concurrency check in the booking suite",
+        },
+        { id: "H", text: "Readable layout", criterion: "human" },
+      ],
+      scenarios: [],
+    });
+    const { task } = await f.create(planned);
+    const input = {
+      taskId: task.id,
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      scope: "selected" as const,
+      requirementIds: ["A"],
+      accepted: true,
+      actor: "user",
+      humanConfirmed: true as const,
+      source: "ui" as const,
+      sourceRef: null,
+      rationale: "",
+    };
+    const detail = await f.service.approveDelivery(input);
+    expect(detail.approvals[0].requirementIds).toEqual(["A"]);
+    expect(detail.judgments).toEqual([]);
+    expect(detail.task.status).toBe("unverified");
+    await expect(
+      f.service.approveDelivery({ ...input, scope: "delivery" }),
+    ).rejects.toThrow("empty requirementIds");
+    const whole = await f.service.approveDelivery({
+      ...input,
+      scope: "delivery",
+      requirementIds: [],
+    });
+    expect(whole.approvals[1].requirementIds).toEqual(["A", "H"]);
+    expect(whole.task.status).toBe("unverified");
+    const draft = await f.service.createTask({
+      threadId: "thread",
+      spec: specSchema.parse({
+        ...planned,
+        requirements: [{ ...planned.requirements[0], reviewInstructions: "" }],
+      }),
+    });
+    await expect(
+      f.service.startTask({ taskId: draft.task.id, expectedVersion: 1 }),
+    ).rejects.toThrow("usable verification route");
+  });
+
   it("no-change refresh never publishes a fetch loop", async () => {
     const f = fixture();
     const { task } = await f.create();
@@ -360,7 +530,8 @@ describe("Factory acceptance against real SQLite migrations", () => {
           id: "R2",
           text: "Waitlist loser",
           criterion: "automated",
-          reviewInstructions: "",
+          verificationMethods: [],
+          reviewInstructions: "Add a waitlist check",
           artifactRefs: [],
         },
       ],
@@ -426,6 +597,7 @@ describe("Factory acceptance against real SQLite migrations", () => {
           id: "R1",
           text: "Review visual design",
           criterion: "human",
+          verificationMethods: [],
           reviewInstructions: "",
           artifactRefs: [],
         },
@@ -464,7 +636,7 @@ describe("Factory acceptance against real SQLite migrations", () => {
     ).rejects.toThrow("changed since review");
     expect((await f.service.getTaskDetail(task.id)).task.status).toBe("stale");
   });
-  it("persists stop before a blocked check returns and cannot overwrite it with green evidence", async () => {
+  it("persists stop before a blocked check returns without invalidating settled evidence", async () => {
     const f = fixture();
     const { task } = await f.create();
     let release!: () => void;
@@ -480,12 +652,15 @@ describe("Factory acceptance against real SQLite migrations", () => {
     });
     const verify = f.service.verifyTask(task.id);
     await began;
+    expect((await f.service.getTaskDetail(task.id)).task.executionRunning).toBe(
+      true,
+    );
     const cancel = f.service.cancelTask({ taskId: task.id, archive: true });
     expect(createStore(f.connection.$client).stopped(task.id)).toBe(1);
     release();
     await verify;
     const result = await cancel;
-    expect(result.task.status).toBe("unverified");
+    expect(result.task.status).toBe("accepted");
     expect(result.task.archived).toBe(true);
     const restarted = createFactoryService(f.bb);
     expect((await restarted.getTaskDetail(task.id)).task.stopRequested).toBe(
@@ -847,8 +1022,8 @@ describe("Factory living specification lifecycle and review evidence", () => {
       requirementIds: ["H1", "H2"],
     });
     expect(judged.judgments.map((judgment) => judgment.rationale)).toEqual([
-      "Accepted reviewed requirements",
-      "Accepted reviewed requirements",
+      "",
+      "",
     ]);
     expect(judged.task.status).toBe("accepted");
     expect(

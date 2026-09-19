@@ -16,6 +16,11 @@ export function registerFactoryTasks(
       input: z.infer<typeof factoryRpcContract.factoryGetTask.input>,
     ) => service.getTaskDetail(input.taskId),
     factoryCreateTask: service.createTask,
+    factoryApproveDelivery: service.approveDelivery,
+    factoryRecordDelivery: service.recordDelivery,
+    factoryResumeTask: service.resumeTask,
+    factoryExportSpec: service.exportSpec,
+    factoryImportSpec: service.importSpec,
     factoryUpdateTask: service.updateTask,
     factoryStartTask: service.startTask,
     factoryVerifyTask: (
@@ -145,6 +150,30 @@ export function registerFactoryTasks(
   });
   const cliActions = {
     ...actions,
+    approve: (input: unknown) => {
+      const parsed =
+        factoryRpcContract.factoryApproveDelivery.input.parse(input);
+      return service.approveDelivery({
+        ...parsed,
+        source: parsed.source === "chat" ? "chat" : "cli",
+      });
+    },
+    deliver: (input: unknown) =>
+      service.recordDelivery(
+        factoryRpcContract.factoryRecordDelivery.input.parse(input),
+      ),
+    resume: (input: unknown) =>
+      service.resumeTask(
+        factoryRpcContract.factoryResumeTask.input.parse(input),
+      ),
+    export: (input: unknown) =>
+      service.exportSpec(
+        factoryRpcContract.factoryExportSpec.input.parse(input),
+      ),
+    import: (input: unknown) =>
+      service.importSpec(
+        factoryRpcContract.factoryImportSpec.input.parse(input),
+      ),
     judge: (input: unknown) =>
       handlers.factoryRecordJudgment(
         factoryRpcContract.factoryRecordJudgment.input.parse(input),
