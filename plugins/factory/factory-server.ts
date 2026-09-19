@@ -78,7 +78,9 @@ export default async function registerFactory(bb: BbPluginApi) {
             : "factory";
       const command = commands.get(
         group === "workflows" &&
-          ["inspect", "guide", "guide-status", "wait"].includes(argv[1] ?? "")
+          ["inspect", "guide", "guide-status", "wait"].includes(
+            argv[1] === "help" ? (argv[2] ?? "") : (argv[1] ?? ""),
+          )
           ? "execution-control"
           : group,
       );
@@ -88,8 +90,19 @@ export default async function registerFactory(bb: BbPluginApi) {
         context,
       );
       const help =
-        argv.includes("--help") || argv.includes("-h") || argv.includes("help");
+        argv.includes("--help") ||
+        argv.includes("-h") ||
+        argv.includes("help") ||
+        (group === "workflows" && argv.length === 1);
       if (group !== "factory" && help && result.stdout) {
+        const executionRootHelp =
+          group === "workflows" &&
+          (argv.length === 1 ||
+            ["--help", "-h"].includes(argv[1] ?? "") ||
+            (argv[1] === "help" && argv.length === 2));
+        const controlHelp = executionRootHelp
+          ? await commands.get("execution-control")?.run(["--help"], context)
+          : undefined;
         return {
           ...result,
           stdout:
@@ -99,8 +112,12 @@ export default async function registerFactory(bb: BbPluginApi) {
                 `bb factory ${group === "workflows" ? "execution" : group} `,
               )
               .replaceAll("bb execution-control ", "bb factory execution ") +
-            (group === "workflows"
-              ? "\nAssignment control: inspect|guide|guide-status|wait --input <json>\n"
+            (controlHelp?.stdout
+              ? "\n" +
+                controlHelp.stdout.replaceAll(
+                  "bb execution-control",
+                  "bb factory execution",
+                )
               : ""),
         };
       }
@@ -113,6 +130,21 @@ export default async function registerFactory(bb: BbPluginApi) {
         return {
           ...result,
           stdout: `${result.stdout ?? ""}\nExecution: bb factory execution --help\nTeam: bb factory team get|set --help\nReview: bb factory review collect --help\n`,
+        };
+      }
+      if (group === "workflows" && result.exitCode !== 0) {
+        const rewrite = (text: string) =>
+          text
+            .replaceAll("bb workflows", "bb factory execution")
+            .replaceAll("bb execution-control", "bb factory execution");
+        return {
+          ...result,
+          ...(result.stdout === undefined
+            ? {}
+            : { stdout: rewrite(result.stdout) }),
+          ...(result.stderr === undefined
+            ? {}
+            : { stderr: rewrite(result.stderr) }),
         };
       }
       return result;

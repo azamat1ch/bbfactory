@@ -1,3 +1,4 @@
+import { workflowExecutionRpcContract } from "./execution/execution-contract.js";
 import { afterEach, expect, it } from "vitest";
 import {
   createFakePluginHost,
@@ -130,6 +131,28 @@ it("upgrades the existing Team database and retains all Factory tools and skills
   expect(taskHelp.stdout).toContain("agent-review");
   expect(taskHelp.stdout).toContain("note");
   expect(taskHelp.stdout).toContain("judge-many");
+  const executionHelp = await upgraded.harness.behavior.runCli(["execution", "--help"]);
+  expect(executionHelp.stdout).toContain("guide-status");
+  expect(executionHelp.stdout).toContain("wait");
+  const helpContracts = {
+    inspect: workflowExecutionRpcContract.experimental_executionInspect,
+    guide: workflowExecutionRpcContract.experimental_executionGuide,
+    "guide-status": workflowExecutionRpcContract.experimental_executionGuideStatus,
+    wait: workflowExecutionRpcContract.experimental_executionWait,
+  };
+  for (const [command, contract] of Object.entries(helpContracts)) {
+    const help = await upgraded.harness.behavior.runCli(["execution", command, "--help"]);
+    expect(help.exitCode).toBe(0);
+    expect(help.stdout).toContain(`bb factory execution ${command} --input '`);
+    expect(help.stdout).not.toMatch(/bb workflows|bb execution-control/);
+    const json = help.stdout.match(/--input '(\{[^\n]+\})'/)?.[1];
+    expect(json).toBeDefined();
+    expect(() => contract.input.parse(JSON.parse(json!))).not.toThrow();
+  }
+  const guideHelp = await upgraded.harness.behavior.runCli(["execution", "help", "guide"]);
+  expect(guideHelp.exitCode).toBe(0);
+  expect(guideHelp.stdout).toContain('"mode":"steer"');
+
   const configuration =
     await upgraded.harness.behavior.resolveAgentConfiguration(
       makePluginAgentConfigurationContext(),

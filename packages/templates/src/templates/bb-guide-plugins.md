@@ -1002,3 +1002,8 @@ execution identity, assignmentId, guidanceId, message and `steer`/`followUp` mod
 timeoutMs. Start task assignments with `bb factory assign --input <json>`.
 Existing Workflows runs retain their owner and must settle before disabling its
 plugin. Factory can still inspect settled legacy task results afterward.
+
+`bb factory execution --help` lists run and assignment-control commands together.
+`bb factory execution guide --help` and `bb factory execution wait --help` include
+complete JSON examples, accepted modes, cursor reuse and timeout bounds; these
+commands do not require looking up raw RPC schemas to construct their input.

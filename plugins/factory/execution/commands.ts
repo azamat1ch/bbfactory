@@ -12,6 +12,8 @@ export function registerExecutionCommands(
       summary: "Observe, steer and collect native Factory assignments",
       commands: {
         inspect: cliCommand({
+          description:
+            'Use the origin thread, task and launch IDs from the Factory assignment. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution inspect --input \'{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id"}\'',
           summary:
             "Inspect an execution by originThreadId, callerTaskId and launchId",
           options: {
@@ -35,6 +37,8 @@ export function registerExecutionCommands(
           },
         }),
         guide: cliCommand({
+          description:
+            'Use the assignment ID from the task. Reuse guidanceId only to retry the same message; use a new ID for new guidance. mode is steer for an active turn or followUp for another turn. Submitted delivery does not establish compliance. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution guide --input \'{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id","assignmentId":"implementation","guidanceId":"correction-1","message":"Run the focused regression before returning.","mode":"steer"}\'',
           summary: "Steer or follow up an assignment with a durable guidanceId",
           options: {
             input: {
@@ -58,6 +62,8 @@ export function registerExecutionCommands(
           },
         }),
         "guide-status": cliCommand({
+          description:
+            'Use the same execution identity and guidanceId passed to guide. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution guide-status --input \'{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id","guidanceId":"correction-1"}\'',
           summary: "Read a durable guidance receipt",
           options: {
             input: {
@@ -80,6 +86,8 @@ export function registerExecutionCommands(
           },
         }),
         wait: cliCommand({
+          description:
+            'Wait for 1\u201332 targets. Start afterCursor at 0; on later calls use the returned cursor for each target. timeoutMs is required, from 0 (poll) through 30000. A timeout is not failure or cancellation. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution wait --input \'{"targets":[{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id","afterCursor":0}],"timeoutMs":30000}\'',
           summary:
             "Wait for bounded execution progress and collect worker output",
           options: {
