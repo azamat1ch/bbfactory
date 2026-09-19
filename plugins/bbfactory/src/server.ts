@@ -76,7 +76,7 @@ export function registerFactoryTasks(
       handlers.factoryResolveFinding(
         factoryRpcContract.factoryResolveFinding.input.parse(input),
       ),
-    review: (input: unknown) =>
+    "agent-review": (input: unknown) =>
       handlers.factoryRecordAgentReview(
         factoryRpcContract.factoryRecordAgentReview.input.parse(input),
       ),
@@ -88,7 +88,7 @@ export function registerFactoryTasks(
   bb.agents.registerTool({
     name: "bb_factory",
     description:
-      "Persist requirements, optional scenarios, actual check links, native worker assignments and review evidence. Direct work needs create then verify. Completion is not acceptance. Emit previewDirective once. Human criteria require the user's explicit UI/CLI attestation; never impersonate human approval.",
+      "Persist requirements, optional scenarios, actual check links, native worker assignments and review evidence. Direct work needs create, start, then verify. Completion is not acceptance. Emit previewDirective once. Human criteria require the user's explicit UI/CLI attestation; never impersonate human approval.",
     parameters: z.discriminatedUnion("action", [
       z.strictObject({
         action: z.literal("create"),
@@ -131,7 +131,7 @@ export function registerFactoryTasks(
         input: factoryRpcContract.factoryResolveFinding.input,
       }),
       z.strictObject({
-        action: z.literal("review"),
+        action: z.literal("agent-review"),
         input: factoryRpcContract.factoryRecordAgentReview.input,
       }),
       z.strictObject({

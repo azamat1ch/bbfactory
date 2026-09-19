@@ -8,11 +8,13 @@ Direct work needs a task and final verification; no delegated worker is required
 
 ## Agent, SDK and CLI
 
-The `bb_factory` tool accepts `{action, input}`. Actions are `create`, `update`, `start`, `status`, `list`, `verify`, `assign`, `cancel`, `finding`, `resolve`, `review`, and `note`. Input follows the corresponding RPC schema in [src/shared.ts](src/shared.ts). Human judgment is deliberately absent from the agent tool.
+The `bb_factory` tool accepts `{action, input}`. Actions are `create`, `update`, `start`, `status`, `list`, `verify`, `assign`, `cancel`, `finding`, `resolve`, `agent-review`, and `note`. Input follows the corresponding RPC schema in [src/shared.ts](src/shared.ts). Human judgment is deliberately absent from the agent tool.
 
 SDK consumers use `sdk.plugins.callRpc({pluginId: "factory-team", method, input, outputSchema})` with `factoryRpcContract`. Delegation uses the public Workflows experimental execution RPC; Team preferences use the existing `factory-team` RPC. Factory and Workflows must be enabled for delegation. Direct task verification does not require Workflows.
 
 The CLI exposes the same records through `bb factory <action> --input '<JSON>'`, plus `judge` and `judge-many` for explicitly authorized human attestations. `judge-many` accepts one or more human requirement IDs and validates the whole batch before writing it atomically. Both commands require `humanConfirmed:true`, actor, accepted boolean, expectedVersion and expectedFingerprint from the displayed task. Rejections require rationale; an accepted batch with empty rationale stores `Accepted reviewed requirements`. Changed content or specification rejects the attestation rather than silently applying it to a new result. These are user attestations, not cryptographic provenance: an API credential holder can submit one. Agents must never invent human authorization.
+
+Use `bb factory agent-review` to record agent acceptance evidence. The separate `bb factory review collect` command collects structured reviewer outputs and retains its existing command group.
 
 ```sh
 bb factory create --input '{"threadId":"THREAD","spec":{"goal":"Prevent duplicate bookings","scope":"booking service","requirements":[{"id":"R1","text":"Two requests for the last place yield exactly one booking","criterion":"automated"}],"scenarios":[],"checks":[{"id":"race","requirementIds":["R1"],"testRef":"tests/booking.test.ts#concurrent","argv":["pnpm","test","tests/booking.test.ts"],"timeoutMs":60000,"required":true}]}}'

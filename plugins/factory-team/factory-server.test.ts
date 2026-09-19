@@ -4,6 +4,7 @@ import {
   makePluginAgentConfigurationContext,
   makeThreadResponse,
 } from "@get-bb/plugin-sdk/testing";
+import { factoryRpcContract } from "../bbfactory/src/shared.js";
 import registerFactory from "./factory-server.js";
 import registerTeam from "./server.js";
 
@@ -15,7 +16,30 @@ it("upgrades the existing Team database and retains all Factory tools and skills
   const old = createFakePluginHost({
     pluginId: "factory-team",
     agentSkillIds: ["team", "pragmatic-orchestration"],
-    sdk: { threads: { get: async () => makeThreadResponse() } },
+    sdk: {
+      threads: {
+        get: async ({ threadId }) =>
+          makeThreadResponse({
+            id: threadId,
+            projectId: "project-1",
+            environmentId: "env-1",
+          }),
+      },
+      environments: {
+        get: async ({ environmentId }) => ({
+          id: environmentId,
+          projectId: "project-1",
+          hostId: "host-1",
+          path: "/workspace",
+        }),
+      },
+    },
+    experimental_callHostRpc: async () => ({
+      fingerprint: "content-v1",
+      canonicalPath: "/workspace",
+      complete: true,
+      detail: null,
+    }),
   });
   registerTeam(old.bb);
   const scope = { kind: "thread", id: "thread-test" };
@@ -62,9 +86,48 @@ it("upgrades the existing Team database and retains all Factory tools and skills
     (await upgraded.harness.behavior.runCli(["review", "collect", "--help"]))
       .stdout,
   ).toContain("bb factory review collect");
+  const created = factoryRpcContract.factoryCreateTask.output.parse(
+    await upgraded.harness.behavior.callRpc("factoryCreateTask", {
+      threadId: "thread-test",
+      spec: {
+        goal: "Review agent-owned behavior",
+        scope: "Factory composition",
+        requirements: [
+          {
+            id: "R1",
+            text: "Agent review records current evidence",
+            criterion: "agent",
+          },
+        ],
+        scenarios: [],
+        checks: [],
+      },
+    }),
+  );
+  await upgraded.harness.behavior.callRpc("factoryStartTask", {
+    taskId: created.task.id,
+    expectedVersion: 1,
+  });
+  const agentReview = await upgraded.harness.behavior.runCli([
+    "agent-review",
+    "--input",
+    JSON.stringify({
+      taskId: created.task.id,
+      requirementIds: ["R1"],
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      reviewer: "review-agent",
+      summary: "Current content satisfies the agent criterion",
+      limitations: "",
+      artifactRefs: ["review://composition"],
+      accepted: true,
+    }),
+  ]);
+  expect(agentReview).toMatchObject({ exitCode: 0 });
+  expect(JSON.parse(agentReview.stdout).reviews).toHaveLength(1);
   const taskHelp = await upgraded.harness.behavior.runCli(["--help"]);
   expect(taskHelp.stdout).toContain("start");
-  expect(taskHelp.stdout).toContain("review");
+  expect(taskHelp.stdout).toContain("agent-review");
   expect(taskHelp.stdout).toContain("note");
   expect(taskHelp.stdout).toContain("judge-many");
   const configuration =
@@ -76,6 +139,27 @@ it("upgrades the existing Team database and retains all Factory tools and skills
     "bb_review_collect",
     "bb_team_get",
   ]);
+  const toolReview = await upgraded.harness.callAgentTool("bb_factory", {
+    action: "agent-review",
+    input: {
+      taskId: created.task.id,
+      requirementIds: ["R1"],
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      reviewer: "review-agent",
+      summary: "The agent tool uses the canonical action name",
+      limitations: "",
+      artifactRefs: ["review://agent-tool"],
+      accepted: true,
+    },
+  });
+  expect(JSON.parse(String(toolReview)).reviews).toHaveLength(2);
+  await expect(
+    upgraded.harness.callAgentTool("bb_factory", {
+      action: "review",
+      input: {},
+    }),
+  ).rejects.toThrow("arguments are invalid");
   await expect(
     upgraded.harness.callAgentTool("bb_factory", {
       action: "judge-many",
@@ -104,5 +188,7 @@ it("upgrades the existing Team database and retains all Factory tools and skills
     await reloaded.harness.behavior.callRpc("factoryListTasks", {
       threadId: "thread-test",
     }),
-  ).toEqual({ tasks: [] });
+  ).toMatchObject({
+    tasks: [{ id: created.task.id, phase: "active", status: "accepted" }],
+  });
 });
