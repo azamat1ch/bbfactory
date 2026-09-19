@@ -328,6 +328,31 @@ describe("thread runtime config", () => {
       providerId: "acp-hermes-agent",
       requestedModel: "acp-default",
     },
+    {
+      expectedSpec: {
+        displayName: "Devin",
+        command: "devin",
+        args: ["acp"],
+        env: {},
+        nativeSkillRoots: {
+          user: [
+            { path: ".agents/skills" },
+            { path: ".claude/skills" },
+            { path: ".cursor/skills" },
+          ],
+          project: [
+            { path: ".devin/skills", ancestors: true },
+            { path: ".cognition/skills", ancestors: true },
+            { path: ".agents/skills", ancestors: true },
+            { path: ".windsurf/skills", ancestors: true },
+            { path: ".cursor/skills", ancestors: true },
+            { path: ".claude/skills", ancestors: true },
+          ],
+        },
+      },
+      providerId: "acp-devin",
+      requestedModel: "swe-2-high",
+    },
   ])(
     "carries plugin-declared ACP launch specs for $providerId in bridge options",
     async ({ expectedSpec, providerId, requestedModel }) => {

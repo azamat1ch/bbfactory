@@ -1,5 +1,6 @@
 import type { AcpAgentDefinition } from "./agents.js";
 import { resolveCursorNativeRoots } from "./native-roots/cursor.js";
+import { resolveDevinNativeRoots } from "./native-roots/devin.js";
 import { resolveGrokNativeRoots } from "./native-roots/grok.js";
 import { resolveHermesNativeRoots } from "./native-roots/hermes.js";
 import { resolveOmpNativeRoots } from "./native-roots/omp.js";
@@ -210,6 +211,43 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
       },
     },
     nativeRootsResolver: resolveHermesNativeRoots,
+  },
+  {
+    id: "acp-devin",
+    displayName: "Devin",
+    signInCommand: "devin auth login",
+    installUrl: "https://docs.devin.ai/cli",
+    visibility: "installed",
+    supportsServiceTier: false,
+    fork: "none",
+    primaryModels: [
+      "adaptive",
+      "swe-2-high",
+      "claude-opus-5-medium",
+      "gpt-5-6-sol-medium",
+    ],
+    launch: {
+      displayName: "Devin",
+      command: "devin",
+      args: ["acp"],
+      env: {},
+      nativeSkillRoots: {
+        user: plainRoots([
+          ".agents/skills",
+          ".claude/skills",
+          ".cursor/skills",
+        ]),
+        project: ancestorRoots([
+          ".devin/skills",
+          ".cognition/skills",
+          ".agents/skills",
+          ".windsurf/skills",
+          ".cursor/skills",
+          ".claude/skills",
+        ]),
+      },
+    },
+    nativeRootsResolver: resolveDevinNativeRoots,
   },
 ];
 

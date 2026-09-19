@@ -314,6 +314,7 @@ describe("known agent declarations", () => {
       "acp-omp",
       "acp-grok",
       "acp-hermes-agent",
+      "acp-devin",
     ]);
     expect(
       KNOWN_ACP_AGENTS.every(

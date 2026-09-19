@@ -378,6 +378,11 @@ describe("buildPluginProviderRegistration", () => {
         logoUrl: "/api/v1/system/providers/acp-hermes-agent/logo",
         icon: undefined,
       },
+      {
+        id: "acp-devin",
+        logoUrl: null,
+        icon: undefined,
+      },
     ]);
   });
 
@@ -404,6 +409,7 @@ describe("buildPluginProviderRegistration", () => {
       "acp-omp": "collapse",
       "acp-grok": "collapse",
       "acp-hermes-agent": "collapse",
+      "acp-devin": "collapse",
     });
   });
 });
