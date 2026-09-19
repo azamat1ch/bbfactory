@@ -2,7 +2,7 @@ import {
   resolveHostEnvironment,
   mergeHostAndProviderEnvironment,
 } from "../hosts/host-environment.js";
-import { getEnvironment, getHost, getProject } from "@bb/db";
+import { getEnvironment, getHost, getProject, patchThreadPluginMetadata } from "@bb/db";
 import type {
   DynamicTool,
   InstructionMode,
@@ -285,6 +285,22 @@ export async function resolveThreadRuntimeCommandConfig(
     hostId: args.environment.hostId,
     threadId: args.thread.id,
   });
+  const recorded = patchThreadPluginMetadata(deps.db, {
+    threadId: args.thread.id,
+    pluginId: "bb-agent-context",
+    set: { snapshot: {
+      capturedAt: Date.now(), providerId: args.thread.providerId, model: args.model,
+      source: "bb-prepared", instructions,
+      skills: injectedSkillSources.map(({ name, description, sourceType }) => ({ name, description, sourceType })),
+      tools: dynamicTools.map(({ name, description }) => ({ name, description })),
+      harnessAdditions: "not-observed",
+    } },
+    remove: [],
+  });
+  if (!recorded.ok) {
+    patchThreadPluginMetadata(deps.db, { threadId: args.thread.id, pluginId: "bb-agent-context", set: {}, remove: ["snapshot"] });
+    deps.logger.warn({ threadId: args.thread.id }, "Prepared agent context exceeds diagnostic storage limit");
+  }
   return {
     contributedEnv,
     dynamicTools,

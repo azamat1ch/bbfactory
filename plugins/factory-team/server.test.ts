@@ -69,10 +69,9 @@ describe("Team preferences", () => {
 
   it("keeps the native execution tuple and re-reads changes in the same agent session", async () => {
     const { harness } = setup();
-    const ctx = { threadId: "thread-1", projectId: "project-1" };
     expect(
-      await harness.behavior.callAgentTool("bb_team_get", {}, ctx),
-    ).toContain('"mode":"auto"');
+      await harness.behavior.callRpc("get", { scope: threadScope }),
+    ).toMatchObject({ preference: { mode: "auto" } });
     const selected = {
       ...profile,
       providerId: "codex",
@@ -85,10 +84,32 @@ describe("Team preferences", () => {
       preference: { mode: "selected", profiles: [selected] },
       expectedRevision: 0,
     });
-    const result = await harness.behavior.callAgentTool("bb_team_get", {}, ctx);
-    expect(result).toContain(JSON.stringify(selected));
-    expect(result).toContain("explicit user instructions override");
+    const result = await harness.behavior.callRpc("get", { scope: threadScope });
+    expect(result).toMatchObject({ preference: { profiles: [selected] } });
     expect(harness.inspection.sdk.callsTo("threads.spawn")).toEqual([]);
+  });
+
+  it("remembers defaults across projects and restart while preserving local overrides", async () => {
+    const { harness } = setup();
+    await harness.behavior.callRpc("set", {
+      scope: threadScope, preference: { mode: "selected", profiles: [profile] }, expectedRevision: 0,
+    });
+    const replacement = await harness.lifecycle.reload(plugin);
+    hosts.push(replacement);
+    const h = replacement.harness;
+    expect(await h.behavior.callRpc("get", { scope: { kind: "project", id: "another-project" } }))
+      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    await h.behavior.callRpc("set", {
+      scope: { kind: "thread", id: "local-thread" }, preference: { mode: "off", profiles: [] }, expectedRevision: 0, remember: false,
+    });
+    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "fresh-thread" } }))
+      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "local-thread" } }))
+      .toMatchObject({ preference: { mode: "off" } });
+    await h.behavior.callRpc("reset", { scope: { kind: "thread", id: "local-thread" }, expectedRevision: 1 });
+    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "local-thread" } }))
+      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    expect(h.inspection.sdk.callsTo("threads.spawn")).toEqual([]);
   });
 
   it("rejects empty selections, duplicate models and stale-window writes", async () => {

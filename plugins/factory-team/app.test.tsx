@@ -65,6 +65,7 @@ describe("native Team control", () => {
         scope: { kind: "thread", id: "thread-1" },
         preference: { mode: "off", profiles: [] },
         expectedRevision: 0,
+        remember: true,
       }),
     );
     expect(await slot.findByRole("button", { name: "Team: Off" })).toBeTruthy();

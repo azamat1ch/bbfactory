@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const identifier = z.string().trim().min(1).max(200);
 export const scopeSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("user"), id: z.literal("default") }),
   z.strictObject({ kind: z.literal("thread"), id: identifier }),
   z.strictObject({ kind: z.literal("project"), id: identifier }),
 ]);
@@ -50,6 +51,10 @@ export const recordSchema = z.strictObject({
   revision: z.number().int().nonnegative(),
 });
 export const teamRpcContract = defineRpcContract({
+  reset: {
+    input: z.strictObject({ scope: scopeSchema, expectedRevision: z.number().int().nonnegative() }),
+    output: recordSchema,
+  },
   get: {
     input: z.strictObject({ scope: scopeSchema }),
     output: z.strictObject({
@@ -62,6 +67,7 @@ export const teamRpcContract = defineRpcContract({
       scope: scopeSchema,
       preference: preferenceSchema,
       expectedRevision: z.number().int().nonnegative(),
+      remember: z.boolean().default(true),
     }),
     output: recordSchema,
   },
@@ -75,4 +81,4 @@ export const DEFAULT_PREFERENCE: TeamPreference = {
   profiles: [],
 };
 export const TEAM_CHANGED = "team-changed";
-export const TEAM_INSTRUCTIONS = `Before each new user task, call bb_team_get to read this conversation's current Team preference, even in an existing session. Treat it as the user's delegation preference, not permission to start work. Explicit user directions for this task override it; do not silently change the saved preference. Auto: decide whether delegation is worth its coordination cost. Off: work directly unless the user explicitly overrides it. Selected: when delegating, use only the returned provider/model/reasoning/service-tier profiles unless the user explicitly overrides them. These are eligible profiles, not worker counts or instructions to launch one of each. Check native provider availability and permissions before launching; if a selected profile is unavailable, report that instead of silently substituting. Use BB-native worker threads for cross-provider delegation and preserve the current lead. Isolate independent writers, expose native worker progress, and distinguish completion from verified acceptance. Do not infer quota from a model or account name.`;
+export const TEAM_INSTRUCTIONS = `Factory connects a conversational spec to native assignments and versioned evidence. Use the factory skill for substantial work and bb factory --help to discover commands. Read bb factory team get --json before choosing workers. Prefer direct work when delegation adds overhead. Explicit user instructions override Team; Off stays direct, Auto permits useful delegation, Selected limits eligible profiles without requiring launches. Preserve the chosen lead. Worker completion is not acceptance; record tests, agent inspection or explicit human judgment against the reviewed version.`;

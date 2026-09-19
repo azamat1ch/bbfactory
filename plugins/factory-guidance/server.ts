@@ -6,12 +6,6 @@ export function registerFactoryGuidance(bb: BbPluginApi) {
     experimental_discoverable: true,
     experimental_description: "Collect independent review passes with attributed failures, quote checks on supplied snapshots, and validated judge verdicts.",
   });
-  bb.agents.registerTool({
-    name: "bb_review_collect",
-    description: "Union completed reviewer XML outputs, preserve failures, check quotes against supplied source snapshots, and validate optional judge JSON. Does not launch workers or establish Factory acceptance. Missing/invalid judge preserves the complete raw union.",
-    parameters: reviewInputSchema,
-    execute: async (input) => JSON.stringify(collectReview(input)),
-  });
   bb.cli.register(defineCli({
     name: "review",
     summary: "Collect results from native reviewer threads",

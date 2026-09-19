@@ -68,6 +68,7 @@ function TeamEditor({ scope }: { scope: TeamScope }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [routing, setRouting] =
     useState<ExperimentalProviderModelPickerRouting>();
   const [seed, setSeed] = useState(EMPTY_PROFILE);
@@ -110,8 +111,8 @@ function TeamEditor({ scope }: { scope: TeamScope }) {
     const signal = scopeSchema.safeParse(payload);
     if (
       !signal.success ||
-      signal.data.kind !== scope.kind ||
-      signal.data.id !== scope.id
+      (signal.data.kind !== "user" &&
+        (signal.data.kind !== scope.kind || signal.data.id !== scope.id))
     )
       return;
     if (open || busy) setChanged(true);
@@ -191,6 +192,7 @@ function TeamEditor({ scope }: { scope: TeamScope }) {
         scope,
         preference: parsed.data,
         expectedRevision: view.revision,
+        remember,
       });
       if (!active.current) return;
       setView({ ...view, ...saved });
@@ -231,9 +233,13 @@ function TeamEditor({ scope }: { scope: TeamScope }) {
         className="factory-team-menu w-80 p-3"
         aria-label="Team preferences"
       >
+        <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={remember} disabled={busy} onChange={(event) => setRemember(event.target.checked)} />
+          Remember for new chats
+        </label>
         <div className="mb-3 text-xs text-muted-foreground">
           {scope.kind === "thread"
-            ? "Team for this conversation"
+            ? "Team for this conversation; remembered choices apply to new chats"
             : "Default team for new conversations in this project"}
         </div>
         {draft ? (

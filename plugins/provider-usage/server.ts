@@ -483,17 +483,6 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         "Read subscription limits across enabled sources, shared accounts and machines. readLimits refreshes all eligible providers; getUsage retains lazy selected-provider behavior.",
     },
   );
-  bb.agents.registerTool({
-    name: "bb_usage_limits",
-    description:
-      "Read subscription usage and reset windows across enabled providers and pooled accounts. Unknown, unsupported and stale measurements are not zero or unlimited capacity. Machines are separate locations; never sum duplicate account quotas across locations.",
-    parameters: { type: "object", properties: {}, additionalProperties: false },
-    async execute() {
-      return JSON.stringify(
-        await readLimits({ force: false, machineIds: null, maxAgeMs: 60_000 }),
-      );
-    },
-  });
   bb.cli.register(
     defineCli({
       name: "usage",

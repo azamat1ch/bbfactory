@@ -678,7 +678,7 @@ it("exposes bounded all-provider limits, preserves freshness and unknowns, and s
         }),
       ]),
     });
-    await host.harness.callAgentTool("bb_usage_limits", {});
+    await host.harness.behavior.callRpc("readLimits", request);
     expect(
       rpc.mock.calls.filter(([args]) => args.method === usageFetchMethod),
     ).toHaveLength(4);

@@ -136,8 +136,6 @@ it("upgrades the existing Team database and retains all Factory tools and skills
     );
   expect(configuration.tools.map((tool) => tool.name).sort()).toEqual([
     "bb_factory",
-    "bb_review_collect",
-    "bb_team_get",
   ]);
   const toolReview = await upgraded.harness.callAgentTool("bb_factory", {
     action: "agent-review",

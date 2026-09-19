@@ -1,3 +1,4 @@
+import { getThreadPluginMetadata } from "@bb/db";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -1186,6 +1187,13 @@ describe("thread runtime config", () => {
           },
         },
       );
+      const recorded = getThreadPluginMetadata(harness.deps.db, thread.id, "bb-agent-context").metadata.snapshot;
+      expect(recorded).toMatchObject({
+        source: "bb-prepared", providerId: thread.providerId, model: "test-model",
+        instructions: runtimeConfig.instructions, harnessAdditions: "not-observed",
+        tools: [{ name: "update_environment_directory" }],
+      });
+      expect(recorded).not.toHaveProperty("contributedEnv");
       setPluginAgentContributions(undefined);
 
       expect(runtimeConfig.workspacePath).toBe("/tmp/runtime-project-root");
