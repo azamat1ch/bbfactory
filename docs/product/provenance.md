@@ -5,7 +5,8 @@
 - **BB:** [get-bb/bb](https://github.com/get-bb/bb), imported from
   `c1a64f4b49b0659e92a7aa4434e79d062b3e814f`. The import commit has the exact
   upstream tree. [LICENSE](../../LICENSE) retains Michael Yong's MIT copyright.
-  The optional `upstream` remote remains available for source inspection.
+  The source link and pinned commit preserve provenance. This distribution's
+  configured remote is the private bbfactory repository.
 - **Pragmatic Orchestration:** [CodeAlive-AI/pragmatic-orchestration](https://github.com/CodeAlive-AI/pragmatic-orchestration/tree/061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5),
   inspected at `061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5`. Practices and source
   inventory inform the design. Porch was used externally during bootstrap;
@@ -31,9 +32,14 @@ rows retain their original hypotheses with explicit superseded labels.
 
 At the user's request, the September 19, 2026 bootstrap history was consolidated
 into a pinned BB import and a coherent bbfactory setup commit. The full previous
-history remains reachable through tag `archive/pre-cleanup-2026-09-19`, pointing
-to `dc634fcba34b02aa0d1bf8c0e961b7a450555419`. The default branch has new commit
-identities; the tag preserves upstream attribution and earlier setup history.
+history was initially retained through tag `archive/pre-cleanup-2026-09-19`,
+pointing to `dc634fcba34b02aa0d1bf8c0e961b7a450555419`. On September 20 the
+original-BB remote references and release tags, including that archive tag,
+were removed from the working repository; the archive tag was also removed
+from GitHub. A verified `all-refs.bundle` preserves them in the development
+workspace's `setup/backups/git-cleanup-*` directory, alongside retired workers'
+uncommitted changes and recovery instructions. The default branch retains its
+clean history. Source attribution and the upstream license remain in the repo.
 No collaborator commit on main was present at the reset. An unmerged inherited
 Dependabot PR was obsolete after this change; inherited scheduling was removed.
 
