@@ -87,6 +87,15 @@ export function createStore(db: Database.Database) {
         "INSERT INTO factory_tasks(id, thread_id, value) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value",
       ).run(parsed.task.id, parsed.task.originThreadId, JSON.stringify(parsed));
     },
+    artifactValue(id: string, taskId: string, kind: string): unknown {
+      const value = db
+        .prepare(
+          "SELECT value FROM factory_artifacts WHERE id = ? AND task_id = ? AND kind = ?",
+        )
+        .pluck()
+        .get(id, taskId, kind);
+      return typeof value === "string" ? JSON.parse(value) : null;
+    },
     artifact(id: string, taskId: string, kind: string, value: unknown) {
       db.prepare(
         "INSERT INTO factory_artifacts(id, task_id, kind, value) VALUES (?, ?, ?, ?)",

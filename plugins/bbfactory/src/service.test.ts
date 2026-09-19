@@ -66,6 +66,9 @@ function fixture() {
   };
   let available = true;
   let nativeFailure = false;
+  let beforeDispatchFailure = false;
+  let nativeRejects = false;
+  const requests = new Map<string, string>();
   let starts = 0;
   let events = 0;
   const rpcCalls: Array<{ pluginId: string; method: string; input?: unknown }> =
@@ -75,6 +78,7 @@ function fixture() {
     {
       runId: string;
       status: string;
+      nativeSettlement: "pending" | "unconfirmed" | "confirmed";
       assignments: Array<{
         id: string;
         callId: string;
@@ -152,11 +156,27 @@ function fixture() {
             }>;
           };
           if (input.method === "experimental_executionStart") {
+            if (beforeDispatchFailure)
+              throw new Error("Transport failed before native dispatch");
+            const existing = runs.get(request.launchId);
+            if (existing) {
+              if (
+                requests.get(request.launchId) !== JSON.stringify(input.input)
+              )
+                throw new Error(
+                  "Native launch identity has a different request",
+                );
+              return existing;
+            }
+            if (nativeRejects)
+              throw new Error(
+                "Assignment workspace has active native execution ownership; replacement blocked",
+              );
             starts++;
             const run = {
               runId: `run-${request.launchId}`,
               status: "succeeded",
-              nativeSettlement: "confirmed",
+              nativeSettlement: "confirmed" as const,
               assignments: request.assignments!.map((a) => ({
                 id: a.id,
                 callId: `call-${a.id}`,
@@ -170,6 +190,7 @@ function fixture() {
               })),
               error: null,
             };
+            requests.set(request.launchId, JSON.stringify(input.input));
             runs.set(request.launchId, run);
             if (nativeFailure)
               throw new Error("Lost response after native launch");
@@ -258,6 +279,18 @@ function fixture() {
     },
     unavailable() {
       available = false;
+    },
+    beforeDispatchFailure(value: boolean) {
+      beforeDispatchFailure = value;
+    },
+    nativeRejects(value: boolean) {
+      nativeRejects = value;
+    },
+    nativeSettlement(value: "pending" | "unconfirmed" | "confirmed") {
+      for (const run of runs.values()) {
+        run.nativeSettlement = value;
+        run.status = value === "pending" ? "running" : "succeeded";
+      }
     },
     nativeFailure(value: boolean) {
       nativeFailure = value;
@@ -500,6 +533,120 @@ describe("Factory native associations and Team selection", () => {
       }),
     ).rejects.toThrow("unavailable");
   });
+  it("replays an immutable request after pre-dispatch loss, restart and a newer specification", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    f.beforeDispatchFailure(true);
+    const input = {
+      taskId: task.id,
+      launchId: "before-send",
+      assignments: [assignment("a")],
+    };
+    const first = await f.service.assign(input);
+    expect(first.assignments[0].nativeStatus).toBe("uncertain");
+    expect(f.starts).toBe(0);
+    const stored = f.connection.$client
+      .prepare(
+        "SELECT value FROM factory_artifacts WHERE task_id = ? AND kind = 'native-launch-request'",
+      )
+      .pluck()
+      .get(task.id);
+    expect(String(stored)).toContain("specification 1");
+    await f.service.updateTask({
+      taskId: task.id,
+      expectedVersion: 1,
+      spec: { ...spec, goal: "A materially newer goal" },
+      changeReason: "Explicit revised scope",
+    });
+    f.beforeDispatchFailure(false);
+    f.off();
+    const restarted = createFactoryService(f.bb);
+    const retried = await restarted.assign(input);
+    expect(retried.assignments[0].threadId).toBe("thread-a");
+    expect(f.starts).toBe(1);
+    const starts = f.rpcCalls.filter(
+      (call) => call.method === "experimental_executionStart",
+    );
+    expect(starts).toHaveLength(2);
+    expect(starts[1].input).toEqual(starts[0].input);
+    expect(JSON.stringify(starts[1].input)).toContain("specification 1");
+    expect(retried.task.specVersion).toBe(2);
+    expect(retried.assignments[0].preferenceRevision).toBe(7);
+  });
+  it("validates native prompt limits before persisting a phantom association", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    await expect(
+      f.service.assign({
+        taskId: task.id,
+        launchId: "oversize",
+        assignments: [{ ...assignment("a"), prompt: "x".repeat(100001) }],
+      }),
+    ).rejects.toThrow();
+    expect(
+      createStore(f.connection.$client).get(task.id).assignments,
+    ).toHaveLength(0);
+    expect(
+      f.connection.$client
+        .prepare(
+          "SELECT COUNT(*) FROM factory_artifacts WHERE task_id = ? AND kind = 'native-launch-request'",
+        )
+        .pluck()
+        .get(task.id),
+    ).toBe(0);
+    expect(f.starts).toBe(0);
+  });
+  it("can retry a native prelaunch rejection after its ownership blocker is resolved", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    f.nativeRejects(true);
+    const input = {
+      taskId: task.id,
+      launchId: "blocked",
+      assignments: [assignment("a")],
+    };
+    expect((await f.service.assign(input)).assignments[0].nativeStatus).toBe(
+      "uncertain",
+    );
+    expect(f.starts).toBe(0);
+    f.nativeRejects(false);
+    expect(
+      (await createFactoryService(f.bb).assign(input)).assignments[0]
+        .nativeStatus,
+    ).toBe("succeeded");
+    expect(f.starts).toBe(1);
+  });
+  it.each(["pending", "unconfirmed"] as const)(
+    "retains native run ownership when individual results are terminal but settlement is %s",
+    async (settlement) => {
+      const f = fixture();
+      const { task } = await f.create();
+      await f.service.assign({
+        taskId: task.id,
+        launchId: "terminal-calls",
+        assignments: [assignment("a")],
+      });
+      f.nativeSettlement(settlement);
+      const refreshed = await f.service.getTaskDetail(task.id);
+      expect(refreshed.assignments[0].nativeStatus).toBe(
+        settlement === "pending" ? "running" : "uncertain",
+      );
+      expect(refreshed.task.status).toBe("unverified");
+      expect(
+        createStore(f.connection.$client).unresolvedAssociations(
+          "host",
+          "/workspace/env",
+        ),
+      ).toHaveLength(1);
+      await expect(f.service.verifyTask(task.id)).rejects.toThrow(
+        "settled native assignments",
+      );
+      f.nativeSettlement("confirmed");
+      expect((await f.service.verifyTask(task.id)).task.status).toBe(
+        "accepted",
+      );
+    },
+  );
   it("reconciles a lost reply after restart without duplicate launch and rejects changed retries", async () => {
     const f = fixture();
     const { task } = await f.create();

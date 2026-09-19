@@ -17,6 +17,16 @@ import {
 type Input<K extends keyof typeof factoryRpcContract> = z.infer<
   (typeof factoryRpcContract)[K]["input"]
 >;
+const launchRecordSchema = z.strictObject({
+  factoryInput: factoryRpcContract.factoryAssign.input,
+  request: workflowExecutionRpcContract.experimental_executionStart.input,
+});
+type NativeSnapshot = z.infer<
+  typeof workflowExecutionRpcContract.experimental_executionInspect.output
+>;
+function launchArtifactId(taskId: string, launchId: string) {
+  return `factory-launch:${JSON.stringify([taskId, launchId])}`;
+}
 export function createFactoryService(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, migrations);
@@ -80,6 +90,69 @@ export function createFactoryService(bb: BbPluginApi) {
       };
     }
   }
+  function applyNativeSnapshot(
+    detail: FactoryTaskDetail,
+    launchId: string,
+    snapshot: NativeSnapshot,
+  ) {
+    for (const association of detail.assignments.filter(
+      (a) => a.launchId === launchId,
+    )) {
+      const result = snapshot.assignments.find(
+        (result) => result.id === association.id,
+      );
+      association.runId = snapshot.runId;
+      association.nativeStatus =
+        snapshot.nativeSettlement === "confirmed" && result
+          ? result.status
+          : snapshot.nativeSettlement === "pending"
+            ? "running"
+            : "uncertain";
+      if (result)
+        Object.assign(association, {
+          threadId: result.threadId,
+          result: result.result,
+          error: result.error,
+        });
+      else
+        association.error =
+          snapshot.error ?? "Native snapshot omitted the assignment";
+    }
+  }
+  function markLaunchUncertain(
+    detail: FactoryTaskDetail,
+    launchId: string,
+    error: unknown,
+  ) {
+    for (const association of detail.assignments.filter(
+      (a) => a.launchId === launchId,
+    )) {
+      association.nativeStatus = "uncertain";
+      association.error = String(error);
+    }
+  }
+  async function dispatchLaunch(
+    detail: FactoryTaskDetail,
+    record: z.infer<typeof launchRecordSchema>,
+  ) {
+    const launchId = record.request.launchId;
+    if (store.stopped(detail.task.id) !== undefined)
+      throw new Error("Task has durable stop intent");
+    try {
+      const snapshot = await bb.sdk.plugins.callRpc({
+        pluginId: "workflows",
+        method: "experimental_executionStart",
+        input: record.request,
+        outputSchema:
+          workflowExecutionRpcContract.experimental_executionStart.output,
+      });
+      applyNativeSnapshot(detail, launchId, snapshot);
+    } catch (error) {
+      markLaunchUncertain(detail, launchId, error);
+    }
+    save(detail);
+    return detail;
+  }
   async function native(detail: FactoryTaskDetail, cancel: boolean) {
     for (const launchId of new Set(detail.assignments.map((a) => a.launchId))) {
       const input = {
@@ -99,32 +172,13 @@ export function createFactoryService(bb: BbPluginApi) {
             ? workflowExecutionRpcContract.experimental_executionCancel.output
             : workflowExecutionRpcContract.experimental_executionInspect.output,
         });
-        for (const result of snapshot.assignments) {
-          const association = detail.assignments.find(
-            (a) => a.launchId === launchId && a.id === result.id,
-          );
-          if (association)
-            Object.assign(association, {
-              runId: snapshot.runId,
-              threadId: result.threadId,
-              nativeStatus:
-                snapshot.nativeSettlement === "unconfirmed"
-                  ? "uncertain"
-                  : result.status,
-              result: result.result,
-              error: result.error,
-            });
-        }
+        applyNativeSnapshot(detail, launchId, snapshot);
       } catch (error) {
-        for (const association of detail.assignments.filter(
-          (a) => a.launchId === launchId,
-        )) {
-          association.nativeStatus = "uncertain";
-          association.error = String(error);
-        }
+        markLaunchUncertain(detail, launchId, error);
       }
     }
   }
+
   function evaluate(detail: FactoryTaskDetail, state: FactoryContent) {
     detail.observedContent = state;
     const task = detail.task;
@@ -405,6 +459,7 @@ export function createFactoryService(bb: BbPluginApi) {
       });
     },
     assign(input: Input<"factoryAssign">) {
+      input = factoryRpcContract.factoryAssign.input.parse(input);
       return locked("assignments", () =>
         locked(input.taskId, async () => {
           const detail = store.get(input.taskId);
@@ -416,34 +471,24 @@ export function createFactoryService(bb: BbPluginApi) {
           )
             throw new Error("Assignment IDs must be unique");
           if (detail.assignments.some((a) => a.launchId === input.launchId)) {
-            const existing = detail.assignments
-              .filter((a) => a.launchId === input.launchId)
-              .map(
-                ({
-                  launchId,
-                  preferenceRevision,
-                  overrideReason,
-                  hostId,
-                  workspacePath,
-                  runId,
-                  threadId,
-                  nativeStatus,
-                  result,
-                  error,
-                  ...assignment
-                }) => assignment,
+            const stored = store.artifactValue(
+              launchArtifactId(input.taskId, input.launchId),
+              input.taskId,
+              "native-launch-request",
+            );
+            if (stored === null) {
+              await native(detail, false);
+              save(detail);
+              throw new Error(
+                "This legacy launch has no immutable dispatch request; native status was refreshed but a replay cannot be reconstructed safely",
               );
-            if (
-              JSON.stringify(existing) !== JSON.stringify(input.assignments) ||
-              detail.assignments.find((a) => a.launchId === input.launchId)
-                ?.overrideReason !== (input.overrideReason ?? null)
-            )
+            }
+            const record = launchRecordSchema.parse(stored);
+            if (JSON.stringify(record.factoryInput) !== JSON.stringify(input))
               throw new Error(
                 "Launch identity already belongs to different assignments",
               );
-            await native(detail, false);
-            save(detail);
-            return detail;
+            return dispatchLaunch(detail, record);
           }
           const team = await bb.sdk.plugins.callRpc({
             pluginId: "factory-team",
@@ -551,57 +596,38 @@ export function createFactoryService(bb: BbPluginApi) {
               error: null,
             });
           }
+          const record = launchRecordSchema.parse({
+            factoryInput: input,
+            request: {
+              projectId: detail.task.projectId,
+              originThreadId: detail.task.originThreadId,
+              callerTaskId: detail.task.id,
+              launchId: input.launchId,
+              assignments: additions.map((a) => ({
+                id: a.id,
+                prompt: `${a.prompt}\n\nFactory task ${detail.task.id}, specification ${detail.task.specVersion}. Role: ${a.role}. Ownership: ${a.ownership} (advisory, not filesystem confinement). Scope: ${a.scope}. Preserve acceptance artifacts. Report changes, checks, unresolved findings and handover.`,
+                title: a.title,
+                ...a.profile,
+                environment: { type: "reuse", environmentId: a.environmentId },
+                permissionMode: a.permissionMode,
+                scope: a.scope,
+              })),
+            },
+          });
           detail.assignments.push(...additions);
           detail.task.status = "unverified";
           detail.task.statusDetail =
             "Native execution requested; worker completion is not acceptance";
-          save(detail);
-          try {
-            const snapshot = await bb.sdk.plugins.callRpc({
-              pluginId: "workflows",
-              method: "experimental_executionStart",
-              input: {
-                projectId: detail.task.projectId,
-                originThreadId: detail.task.originThreadId,
-                callerTaskId: detail.task.id,
-                launchId: input.launchId,
-                assignments: additions.map((a) => ({
-                  id: a.id,
-                  prompt: `${a.prompt}\n\nFactory task ${detail.task.id}, specification ${detail.task.specVersion}. Role: ${a.role}. Ownership: ${a.ownership} (advisory, not filesystem confinement). Scope: ${a.scope}. Preserve acceptance artifacts. Report changes, checks, unresolved findings and handover.`,
-                  title: a.title,
-                  ...a.profile,
-                  environment: {
-                    type: "reuse",
-                    environmentId: a.environmentId,
-                  },
-                  permissionMode: a.permissionMode,
-                  scope: a.scope,
-                })),
-              },
-              outputSchema:
-                workflowExecutionRpcContract.experimental_executionStart.output,
-            });
-            for (const result of snapshot.assignments) {
-              const a = detail.assignments.find(
-                (a) => a.launchId === input.launchId && a.id === result.id,
-              );
-              if (a)
-                Object.assign(a, {
-                  runId: snapshot.runId,
-                  threadId: result.threadId,
-                  nativeStatus:
-                    snapshot.nativeSettlement === "unconfirmed"
-                      ? "uncertain"
-                      : result.status,
-                  result: result.result,
-                  error: result.error,
-                });
-            }
-          } catch (error) {
-            for (const a of additions) a.error = String(error);
-          }
-          save(detail);
-          return detail;
+          db.transaction(() => {
+            store.artifact(
+              launchArtifactId(input.taskId, input.launchId),
+              input.taskId,
+              "native-launch-request",
+              record,
+            );
+            save(detail);
+          })();
+          return dispatchLaunch(detail, record);
         }),
       );
     },

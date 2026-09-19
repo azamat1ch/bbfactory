@@ -19,6 +19,8 @@ bb factory status --input '{"taskId":"TASK"}'
 bb factory cancel --input '{"taskId":"TASK","archive":false}'
 ```
 
+Each native launch request is validated and stored immutably before dispatch, in the same transaction as its task associations. Retrying the same launch replays that exact request through Workflows’ idempotent start operation, including the original specification context; changing the task later never rewrites a pending request. A changed assignment requires a new launch identity. Unknown RPC outcomes keep ownership uncertain until the native owner reports confirmed settlement.
+
 A spec update requires expectedVersion and a changeReason. Prior specifications and check definitions remain immutable. A passing command without a linked required check does not cover a requirement. `testRef` must name an existing file inside the project; check quality and requirement mapping still require review.
 
 ## Evidence and freshness
