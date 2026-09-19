@@ -130,7 +130,7 @@ function readAccountEmail(): string | null {
 
 export interface AcpMaintenanceDialect {
   loginCommand: string;
-  installer(): { command: string; args: string[]; displayCommand: string };
+  installer?(): { command: string; args: string[]; displayCommand: string };
   readAccount(): Promise<{ email: string | null } | null>;
   readUsage(): Promise<ProviderUsageResult>;
 }
@@ -142,7 +142,6 @@ function healthResult(args: {
   installedVersion?: string | null;
   statusMessage?: string | null;
 }): ProviderHealthResult {
-  const maintained = args.maintenance !== undefined;
   return {
     supported: true,
     health: {
@@ -152,8 +151,10 @@ function healthResult(args: {
       planLabel: null,
       installedVersion: args.installedVersion ?? null,
       minimumSupportedVersion: null,
-      canInstall: maintained,
-      canUpdate: maintained && args.status !== "not_installed",
+      canInstall: args.maintenance?.installer !== undefined,
+      canUpdate:
+        args.maintenance?.installer !== undefined &&
+        args.status !== "not_installed",
       loginCommand: args.maintenance?.loginCommand ?? null,
     },
   };
@@ -213,7 +214,7 @@ export async function getAcpProviderInstallationStatus(args: {
       ? await readCliVersion(args.command)
       : null;
   const installAction =
-    args.maintenance !== undefined && !installed
+    args.maintenance?.installer !== undefined && !installed
       ? {
           kind: "install" as const,
           label: "Install" as const,
@@ -255,7 +256,7 @@ function buildAcpProviderInstallationRun(
 ): ProviderInstallationRunResult {
   if (
     status.installAction?.kind !== args.action ||
-    args.maintenance === undefined
+    args.maintenance?.installer === undefined
   ) {
     return {
       available: false,

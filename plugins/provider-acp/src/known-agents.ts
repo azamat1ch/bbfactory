@@ -215,9 +215,13 @@ export const KNOWN_ACP_AGENTS: readonly AcpAgentDefinition[] = [
   {
     id: "acp-devin",
     displayName: "Devin",
+    icon: declaredIcon("devin"),
+    iconTint: { light: "#0B100F", dark: "#FFFFFF" },
     signInCommand: "devin auth login",
     installUrl: "https://docs.devin.ai/cli",
     visibility: "installed",
+    dialect: "devin",
+    providerUsage: true,
     supportsServiceTier: false,
     fork: "none",
     primaryModels: [

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CURSOR_ACP_MAINTENANCE, __testing } from "./provider-maintenance.js";
+import { DEVIN_ACP_MAINTENANCE } from "./provider-maintenance-devin.js";
+import {
+  CURSOR_ACP_MAINTENANCE,
+  __testing,
+  getAcpProviderHealth,
+  getAcpProviderInstallationRun,
+  getAcpProviderInstallationStatus,
+} from "./provider-maintenance.js";
 
 function cursorMissingInstallationStatus() {
   return {
@@ -93,6 +100,49 @@ describe("ACP provider maintenance", () => {
     ).toEqual({
       available: false,
       message: "opencode install is not available on this host.",
+    });
+  });
+
+  it("does not offer install actions for maintenance dialects without an installer", async () => {
+    const devinHealth = await getAcpProviderHealth({
+      maintenance: DEVIN_ACP_MAINTENANCE,
+      command: null,
+    });
+    expect(devinHealth).toMatchObject({
+      supported: true,
+      health: {
+        canInstall: false,
+        canUpdate: false,
+        loginCommand: "devin auth login",
+      },
+    });
+    const cursorHealth = await getAcpProviderHealth({
+      maintenance: CURSOR_ACP_MAINTENANCE,
+      command: null,
+    });
+    expect(cursorHealth).toMatchObject({
+      supported: true,
+      health: { canInstall: true, canUpdate: true },
+    });
+    const missing = "bb-test-definitely-not-installed";
+    const devinStatus = await getAcpProviderInstallationStatus({
+      maintenance: DEVIN_ACP_MAINTENANCE,
+      command: missing,
+    });
+    expect(devinStatus).toMatchObject({ installed: false, installAction: null });
+    const cursorStatus = await getAcpProviderInstallationStatus({
+      maintenance: CURSOR_ACP_MAINTENANCE,
+      command: missing,
+    });
+    expect(cursorStatus.installAction).not.toBeNull();
+    const devinRun = await getAcpProviderInstallationRun({
+      maintenance: DEVIN_ACP_MAINTENANCE,
+      command: missing,
+      action: "install",
+    });
+    expect(devinRun).toEqual({
+      available: false,
+      message: `${missing} install is not available on this host.`,
     });
   });
 });

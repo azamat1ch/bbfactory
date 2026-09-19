@@ -334,13 +334,11 @@ describe("acpProviderDeclaration", () => {
     expect(declaration.capabilities.supportsManualCompaction).toBe(false);
     expect(declaration.capabilities.supportsServiceTier).toBe(false);
     expect(declaration.serviceTiers).toBeUndefined();
-    expect(declaration.maintenance?.usage).toBe(false);
+    expect(declaration.maintenance?.usage).toBe(true);
     expect(declaration.maintenance?.installation).toBe(false);
     expect(declaration.experimental_resolvesNativeRoots).toBe(true);
     expect(declaration.strings?.signInHint).toContain("devin auth login");
-    expect(
-      declaration.experimental_bridgeOptions?.acpDialect,
-    ).toBeUndefined();
+    expect(declaration.experimental_bridgeOptions?.acpDialect).toBe("devin");
 
     const launch = experimental_acpLaunchSpecSchema.parse(
       declaration.experimental_bridgeOptions?.acpLaunchSpec,
