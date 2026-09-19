@@ -453,6 +453,18 @@ CLI is on PATH and can be launched as `grok agent stdio`,
 Devin's `devin` CLI is on PATH and can be launched as `devin acp`. `acp-cursor`
 is always listed.
 
+Devin usage is read separately from ACP through the signed-in local Devin
+installation. On Linux, bb reads `$XDG_DATA_HOME/devin/credentials.toml` (or
+`~/.local/share/devin/credentials.toml`); on macOS it reads
+`~/Library/Application Support/devin/credentials.toml`, and on Windows it
+reads `%APPDATA%/devin/credentials.toml`. The `WINDSURF_API_KEY` and
+`WINDSURF_API_SERVER_URL` environment variables override that file. Sign in
+with the Devin CLI on the host that runs the provider, then use the Provider
+usage page or `bb settings usage --json` to refresh its daily and weekly quota.
+Only accounts whose Devin plan reports quota billing yield percentages; hidden
+windows are omitted, and other plan types show unavailable usage. This reader
+does not report ACU, credit, or overage balances.
+
 Add your own agent through the ACP providers plugin's `customAgents` setting,
 which holds a JSON array. In the app it is the multi-line editor on the
 plugin's settings page (Settings → Plugins → ACP providers); from the CLI:
@@ -481,7 +493,7 @@ an agent that nests skills or reads them from every ancestor directory),
 `permissionCli` (permission-mode launch flags), `supportsManualCompaction`
 (only if the agent accepts an explicit compaction request — bb hides
 `/compact` otherwise), and `dialect` (the vendor side channels bb reads for
-the agent: `cursor`, `opencode`, `omp`, or `grok`).
+the agent: `cursor`, `opencode`, `omp`, `grok`, or `devin`).
 
 The change applies immediately: the plugin re-registers its providers when the
 setting changes, with no restart and no `config refresh`.

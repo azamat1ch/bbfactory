@@ -38,5 +38,10 @@ What lives here:
 - `icons/` — the provider logos, declared in `package.json` under
   `bb.branding.experimental_icons` so the packaged build ships them.
 
+The shipped Devin agent uses a maintenance-only dialect to read daily and
+weekly quota from the signed-in local Devin installation. ACP does not expose
+that quota. See `docs/configuration.md` for credential locations, overrides,
+and the supported usage fields.
+
 The kit itself, including the ACP wire schema, the delta translation, the
 per-agent dialects and the bridge process, is `packages/provider-bridge-acp`.
