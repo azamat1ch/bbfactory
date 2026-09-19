@@ -238,6 +238,46 @@ export const migrations = [
     state TEXT NOT NULL CHECK (state IN ('requested', 'attached', 'stopped'))
   );
   CREATE INDEX workflow_spawn_attempts_run ON workflow_spawn_attempts(run_id, state);`,
+  `CREATE TABLE workflow_execution_guidance (
+    run_id TEXT NOT NULL, guidance_id TEXT NOT NULL, assignment_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL, message TEXT NOT NULL, mode TEXT NOT NULL,
+    delivery TEXT NOT NULL CHECK (delivery IN ('uncertain', 'submitted')),
+    PRIMARY KEY (run_id, guidance_id)
+  );
+  CREATE TABLE workflow_execution_events (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
+    assignment_id TEXT, thread_id TEXT, status TEXT NOT NULL,
+    result_json TEXT, error TEXT
+  );
+  CREATE INDEX workflow_execution_events_run ON workflow_execution_events(run_id, sequence);
+  CREATE UNIQUE INDEX workflow_execution_events_assignment ON workflow_execution_events(run_id, assignment_id) WHERE assignment_id IS NOT NULL;
+  CREATE TRIGGER workflow_execution_call_completed AFTER UPDATE OF status ON workflow_calls
+    WHEN NEW.run_id LIKE 'wfr_exec_%' AND NEW.status = 'succeeded' AND OLD.status != 'succeeded'
+    BEGIN INSERT OR IGNORE INTO workflow_execution_events(run_id, assignment_id, thread_id, status, result_json, error)
+      VALUES (NEW.run_id, json_extract(NEW.options_json, '$.title'), NEW.child_thread_id, NEW.status, NEW.result_json, NEW.error);
+    END;
+  CREATE TRIGGER workflow_execution_run_completed AFTER UPDATE OF status ON workflow_runs
+    WHEN NEW.id LIKE 'wfr_exec_%' AND NEW.status IN ('succeeded', 'failed', 'cancelled') AND OLD.status NOT IN ('succeeded', 'failed', 'cancelled')
+    BEGIN
+      INSERT OR IGNORE INTO workflow_execution_events(run_id, assignment_id, thread_id, status, result_json, error)
+        SELECT NEW.id, json_extract(assignments.value, '$.id'), calls.child_thread_id,
+          CASE WHEN calls.status IN ('failed', 'cancelled') THEN calls.status ELSE NEW.status END,
+          calls.result_json, COALESCE(calls.error, NEW.error)
+        FROM json_each(NEW.args_json, '$.assignments') assignments
+        LEFT JOIN workflow_calls calls ON calls.run_id = NEW.id AND json_extract(calls.options_json, '$.title') = json_extract(assignments.value, '$.id')
+        WHERE calls.status IS NULL OR calls.status != 'succeeded';
+      INSERT INTO workflow_execution_events(run_id, status, result_json, error)
+        VALUES (NEW.id, NEW.status, NEW.result_json, NEW.error);
+    END;
+  INSERT OR IGNORE INTO workflow_execution_events(run_id, assignment_id, thread_id, status, result_json, error)
+    SELECT runs.id, json_extract(assignments.value, '$.id'), calls.child_thread_id,
+      CASE WHEN calls.status IN ('succeeded', 'failed', 'cancelled') THEN calls.status ELSE runs.status END,
+      calls.result_json, COALESCE(calls.error, runs.error)
+    FROM workflow_runs runs JOIN json_each(runs.args_json, '$.assignments') assignments
+    LEFT JOIN workflow_calls calls ON calls.run_id = runs.id AND json_extract(calls.options_json, '$.title') = json_extract(assignments.value, '$.id')
+    WHERE runs.id LIKE 'wfr_exec_%' AND (calls.status = 'succeeded' OR runs.status IN ('succeeded', 'failed', 'cancelled'));
+  INSERT INTO workflow_execution_events(run_id, status, result_json, error)
+    SELECT id, status, result_json, error FROM workflow_runs WHERE id LIKE 'wfr_exec_%' AND status IN ('succeeded', 'failed', 'cancelled');`,
 ];
 
 export function createRun(

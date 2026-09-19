@@ -113,3 +113,12 @@ worktrees are optional. Overlapping canonical roots serialize, distinct roots
 can run concurrently. Scope text and accept-edits are not read-only enforcement.
 Read per-assignment errors, nativeSettlement and stopConfirmed. Native settlement
 does not establish detached-process termination or content acceptance.
+
+Use a stable `guidanceId` with executionGuide. Exact replay returns the persisted
+submitted/uncertain receipt without sending again; changed payload rejects.
+Read executionGuideStatus before deciding on a new correction, and never treat
+submitted as compliance. Both method names have the `experimental_` prefix.
+For group supervision, experimental_executionWait accepts up to 32 execution
+identities plus afterCursor and timeoutMs up to 30000. Save returned cursors and
+wait again; old cursors replay durable bounded completion events after restart.
+Terminal events do not replace nativeSettlement or independent acceptance checks.

@@ -79,6 +79,58 @@ export const executionSnapshotSchema = z
     error: z.string().nullable(),
   })
   .strict();
+export const executionGuidanceReceiptSchema = z
+  .object({
+    guidanceId: id,
+    threadId: id,
+    delivery: z.enum(["submitted", "uncertain"]),
+    compliance: z.literal("unverified"),
+  })
+  .strict();
+export const executionWaitInputSchema = z
+  .object({
+    targets: z
+      .array(
+        executionIdentitySchema.extend({
+          afterCursor: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(Number.MAX_SAFE_INTEGER),
+        }),
+      )
+      .min(1)
+      .max(32),
+    timeoutMs: z.number().int().min(0).max(30_000),
+  })
+  .strict();
+export const executionWaitResultSchema = z
+  .object({
+    event: z
+      .object({
+        sequence: z.number().int().positive(),
+        runId: id,
+        kind: z.enum(["assignment", "run"]),
+        assignmentId: id.nullable(),
+        threadId: id.nullable(),
+        status: z.enum(["succeeded", "failed", "cancelled"]),
+        output: z.string().nullable(),
+        error: z.string().nullable(),
+        outputTruncated: z.boolean(),
+        errorTruncated: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+    cursors: z
+      .array(
+        executionIdentitySchema.extend({
+          cursor: z.number().int().nonnegative(),
+        }),
+      )
+      .max(32),
+    timedOut: z.boolean(),
+  })
+  .strict();
 export const workflowExecutionRpcContract = defineRpcContract({
   experimental_executionStart: {
     input: executionStartSchema,
@@ -94,20 +146,26 @@ export const workflowExecutionRpcContract = defineRpcContract({
   },
   experimental_executionGuide: {
     input: executionIdentitySchema.extend({
+      guidanceId: id,
       assignmentId: id,
       message: z.string().min(1).max(100_000),
       mode: z.enum(["steer", "followUp"]),
     }),
-    output: z
-      .object({
-        threadId: id,
-        delivery: z.literal("submitted"),
-        compliance: z.literal("unverified"),
-      })
-      .strict(),
+    output: executionGuidanceReceiptSchema,
+  },
+  experimental_executionGuideStatus: {
+    input: executionIdentitySchema.extend({ guidanceId: id }),
+    output: executionGuidanceReceiptSchema.nullable(),
+  },
+  experimental_executionWait: {
+    input: executionWaitInputSchema,
+    output: executionWaitResultSchema,
   },
 });
 export type ExecutionIdentity = z.infer<typeof executionIdentitySchema>;
 export type ExecutionStart = z.infer<typeof executionStartSchema>;
 export type ExecutionAssignment = z.infer<typeof executionAssignmentSchema>;
 export type ExecutionSnapshot = z.infer<typeof executionSnapshotSchema>;
+
+export type ExecutionWaitInput = z.infer<typeof executionWaitInputSchema>;
+export type ExecutionWaitResult = z.infer<typeof executionWaitResultSchema>;

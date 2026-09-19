@@ -352,6 +352,10 @@ interface StartWorkflowInput {
 
 export interface WorkflowService {
   start(input: StartWorkflowInput): Promise<WorkflowRunRow>;
+  subscribeExecution(
+    runIds: readonly string[],
+    listener: () => void,
+  ): () => void;
   get(runId: string): WorkflowRunRow | null;
   inspect(runId: string): WorkflowRunInspection | null;
   inspectPage(
@@ -420,6 +424,28 @@ export function createWorkflowService(
 
   function throwIfCancelled(signal: AbortSignal): void {
     if (signal.aborted) throw new Error("Workflow cancelled");
+  }
+
+  const executionListeners = new Map<string, Set<() => void>>();
+  function notifyExecution(runId: string): void {
+    for (const listener of executionListeners.get(runId) ?? []) listener();
+  }
+  function subscribeExecution(
+    runIds: readonly string[],
+    listener: () => void,
+  ): () => void {
+    for (const runId of runIds) {
+      const listeners = executionListeners.get(runId) ?? new Set();
+      listeners.add(listener);
+      executionListeners.set(runId, listeners);
+    }
+    return () => {
+      for (const runId of runIds) {
+        const listeners = executionListeners.get(runId);
+        listeners?.delete(listener);
+        if (listeners?.size === 0) executionListeners.delete(runId);
+      }
+    };
   }
 
   function publishRunsChanged(originThreadId: string): void {
@@ -1124,6 +1150,7 @@ export function createWorkflowService(
   }
 
   function wakeCall(call: WorkflowCallRow): void {
+    notifyExecution(call.runId);
     const waiter = waiters.get(call.id);
     if (waiter === undefined) return;
     waiters.delete(call.id);
@@ -1447,6 +1474,7 @@ export function createWorkflowService(
     args: Parameters<typeof settleRun>[1],
   ): Promise<void> {
     const outstanding = settleRun(db, args);
+    notifyExecution(args.id);
     const settled = getRun(db, args.id);
     if (settled !== null) publishRunsChanged(settled.originThreadId);
     controllers.get(args.id)?.abort();
@@ -1528,7 +1556,21 @@ export function createWorkflowService(
           identity,
           { previous: priorDecision, release: releaseDecision },
           callSignal,
-        );
+        ).catch((error: unknown) => {
+          if (run.id.startsWith("wfr_exec_") && options.title !== null) {
+            const latest = getCall(db, run.id, index);
+            db.prepare(`INSERT OR IGNORE INTO workflow_execution_events
+              (run_id, assignment_id, thread_id, status, result_json, error) VALUES (?, ?, ?, ?, NULL, ?)`).run(
+              run.id,
+              options.title,
+              latest?.childThreadId ?? null,
+              callSignal.aborted ? "cancelled" : "failed",
+              message(error),
+            );
+            notifyExecution(run.id);
+          }
+          throw error;
+        });
         inFlightCalls.add(call);
         void call.catch(() => undefined);
         void call
@@ -1737,6 +1779,15 @@ export function createWorkflowService(
     await isolated("retention", () => sweepExpiredRuns(now));
   }
 
+  function recoverAndNotify(): string[] {
+    const runs = db
+      .prepare("SELECT id FROM workflow_runs WHERE status = 'running'")
+      .all() as Array<{ id: string }>;
+    const children = recoverInterruptedRuns(db);
+    for (const run of runs) notifyExecution(run.id);
+    return children;
+  }
+
   async function runWorker(signal: AbortSignal): Promise<void> {
     signal.addEventListener(
       "abort",
@@ -1752,7 +1803,7 @@ export function createWorkflowService(
       )
       .all() as Array<{ threadId: string }>;
     await stopChildren(recoveringThreads.map((entry) => entry.threadId));
-    await stopChildren(recoverInterruptedRuns(db));
+    await stopChildren(recoverAndNotify());
     const active = new Set<Promise<void>>();
     let nextMaintenanceAt = 0;
     while (!signal.aborted) {
@@ -1796,13 +1847,14 @@ export function createWorkflowService(
       )
       .all() as Array<{ threadId: string }>;
     await stopChildren(shutdownThreads.map((entry) => entry.threadId));
-    await stopChildren(recoverInterruptedRuns(db));
+    await stopChildren(recoverAndNotify());
     await Promise.allSettled(childStops.values());
   }
 
   async function stop(runId: string): Promise<boolean> {
     const childThreadIds = activeChildThreadsForRun(db, runId);
     const stopped = cancelRun(db, runId);
+    notifyExecution(runId);
     if (stopped) {
       const run = getRun(db, runId);
       if (run !== null) publishRunsChanged(run.originThreadId);
@@ -1814,6 +1866,7 @@ export function createWorkflowService(
 
   return {
     start,
+    subscribeExecution,
     get: (runId) => getRun(db, runId),
     inspect,
     inspectPage,

@@ -1,6 +1,7 @@
 import { registerExecutionRpc } from "./execution.js";
 import {
   executionSnapshotSchema,
+  executionWaitResultSchema,
   type ExecutionStart,
 } from "./execution-contract.js";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
@@ -1899,6 +1900,156 @@ describe("native assignment execution RPC", () => {
       ],
     };
   }
+  it("persists uncertain guidance before sending and suppresses replay after a lost response and restart", async () => {
+    const test = fixture();
+    const input = request();
+    await test.harness.callRpc("experimental_executionStart", input);
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(1));
+      test.harness.sdk.stub("threads.send", async () => {
+        throw new Error("Lost guidance response");
+      });
+      const guidance = {
+        ...inputIdentity(input),
+        assignmentId: "implement",
+        guidanceId: "correction-1",
+        message: "Only change src/a.ts",
+        mode: "steer",
+      };
+      expect(
+        await test.harness.callRpc("experimental_executionGuide", guidance),
+      ).toMatchObject({
+        guidanceId: "correction-1",
+        delivery: "uncertain",
+        compliance: "unverified",
+      });
+      expect(test.harness.sdk.callsTo("threads.send")).toHaveLength(1);
+      const reloaded = createFakePluginHost();
+      hosts.push(reloaded.harness);
+      registerExecutionRpc(
+        { ...test.bb, rpc: reloaded.bb.rpc },
+        test.db,
+        createWorkflowService(test.bb, test.db),
+      );
+      expect(
+        await reloaded.harness.callRpc("experimental_executionGuide", guidance),
+      ).toMatchObject({ delivery: "uncertain" });
+      expect(
+        await reloaded.harness.callRpc("experimental_executionGuideStatus", {
+          ...inputIdentity(input),
+          guidanceId: "correction-1",
+        }),
+      ).toMatchObject({ delivery: "uncertain", compliance: "unverified" });
+      await expect(
+        reloaded.harness.callRpc("experimental_executionGuide", {
+          ...guidance,
+          message: "Changed correction",
+        }),
+      ).rejects.toThrow("different request");
+      expect(test.harness.sdk.callsTo("threads.send")).toHaveLength(1);
+      test.harness.sdk.stub("threads.send", async () => ({ ok: true }));
+      const submitted = { ...guidance, guidanceId: "correction-2" };
+      expect(
+        await reloaded.harness.callRpc(
+          "experimental_executionGuide",
+          submitted,
+        ),
+      ).toMatchObject({ delivery: "submitted", compliance: "unverified" });
+      expect(
+        await reloaded.harness.callRpc(
+          "experimental_executionGuide",
+          submitted,
+        ),
+      ).toMatchObject({ delivery: "submitted" });
+      expect(test.harness.sdk.callsTo("threads.send")).toHaveLength(2);
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+
+  it("waits for the first native assignment completion across runs and replays bounded events with durable cursors", async () => {
+    const test = fixture();
+    const first = request();
+    const second = {
+      ...request(),
+      launchId: "second",
+      assignments: [
+        {
+          ...request().assignments[0]!,
+          environment: { type: "reuse" as const, environmentId: "worktree-b" },
+        },
+      ],
+    };
+    await test.harness.callRpc("experimental_executionStart", first);
+    const secondRun = executionSnapshotSchema.parse(
+      await test.harness.callRpc("experimental_executionStart", second),
+    );
+    const targets = [first, second].map((input) => ({
+      ...inputIdentity(input),
+      afterCursor: 0,
+    }));
+    const waiting = test.harness.callRpc("experimental_executionWait", {
+      targets,
+      timeoutMs: 3000,
+    });
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(2));
+      test.service.onThreadIdle("child-2", "completed " + "x".repeat(4000));
+      const delivered = executionWaitResultSchema.parse(await waiting);
+      expect(delivered).toMatchObject({
+        timedOut: false,
+        event: {
+          runId: secondRun.runId,
+          kind: "assignment",
+          assignmentId: "implement",
+          status: "succeeded",
+          outputTruncated: true,
+        },
+      });
+      expect(
+        Buffer.byteLength(delivered.event?.output ?? ""),
+      ).toBeLessThanOrEqual(2048);
+      expect(delivered.cursors[0]?.cursor).toBe(0);
+      const reloaded = createFakePluginHost();
+      hosts.push(reloaded.harness);
+      registerExecutionRpc(
+        { ...test.bb, rpc: reloaded.bb.rpc },
+        test.db,
+        createWorkflowService(test.bb, test.db),
+      );
+      expect(
+        await reloaded.harness.callRpc("experimental_executionWait", {
+          targets,
+          timeoutMs: 0,
+        }),
+      ).toEqual(delivered);
+      const timedOut = executionWaitResultSchema.parse(
+        await reloaded.harness.callRpc("experimental_executionWait", {
+          targets: targets.map((target) => ({
+            ...target,
+            afterCursor: Number.MAX_SAFE_INTEGER,
+          })),
+          timeoutMs: 10,
+        }),
+      );
+      expect(timedOut).toMatchObject({ timedOut: true, event: null });
+      expect(
+        await test.harness.callRpc("experimental_executionWait", {
+          targets: [{ ...inputIdentity(first), afterCursor: 0 }],
+          timeoutMs: 0,
+        }),
+      ).toMatchObject({ timedOut: true, event: null });
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+
   it("deduplicates concurrent start and restart requests and rejects identity mutation", async () => {
     const test = fixture();
     const input = request();
@@ -1942,10 +2093,23 @@ describe("native assignment execution RPC", () => {
     const worker = test.service.runWorker(controller.signal);
     try {
       await eventually(() => expect(test.childCount()).toBe(2));
+      const firstFailure = test.harness.callRpc("experimental_executionWait", {
+        targets: [{ ...inputIdentity(input), afterCursor: 0 }],
+        timeoutMs: 3000,
+      });
       test.service.onThreadFailed(
         "child-1",
         "deterministic assignment failure",
       );
+      expect(await firstFailure).toMatchObject({
+        event: {
+          assignmentId: "implement",
+          status: "failed",
+          error: "deterministic assignment failure",
+        },
+        timedOut: false,
+      });
+      expect(test.service.get(started.runId)?.status).toBe("running");
       test.service.onThreadIdle("child-2", "review result");
       await eventually(async () => {
         const snapshot = executionSnapshotSchema.parse(

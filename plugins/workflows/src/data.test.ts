@@ -77,6 +77,28 @@ describe("workflow durable data", () => {
     permissionMode: "full",
   } as const;
 
+  it("backfills durable terminal events for managed assignments that never started", () => {
+    db.close();
+    db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    db.exec(migrations.slice(0, -1).join("\n"));
+    const run = newRun();
+    db.prepare(
+      "UPDATE workflow_runs SET id = 'wfr_exec_upgrade', status = 'failed', error = 'Restarted', args_json = ? WHERE id = ?",
+    ).run(JSON.stringify({ assignments: [{ id: "unstarted" }] }), run.id);
+    db.exec(migrations.at(-1)!);
+    expect(
+      db
+        .prepare(
+          "SELECT assignment_id AS assignmentId, status, error FROM workflow_execution_events ORDER BY sequence",
+        )
+        .all(),
+    ).toEqual([
+      { assignmentId: "unstarted", status: "failed", error: "Restarted" },
+      { assignmentId: null, status: "failed", error: "Restarted" },
+    ]);
+  });
+
   it("persists failed cleanup deadlines and caps retry delays", () => {
     ownWorker(db, "worker", "missing-run", "missing-call", "origin");
     const clock = vi.spyOn(Date, "now").mockReturnValue(10_000);
@@ -110,7 +132,7 @@ describe("workflow durable data", () => {
     db.close();
     db = new Database(":memory:");
     db.pragma("foreign_keys = ON");
-    db.exec(migrations.slice(0, -4).join("\n"));
+    db.exec(migrations.slice(0, -5).join("\n"));
     const run = newRun();
     markRunning(run.id);
     const call = startCall(db, {
@@ -130,7 +152,7 @@ describe("workflow durable data", () => {
     db.prepare(
       `UPDATE workflow_calls SET child_thread_id = 'legacy-worker', status = 'failed' WHERE id = ?`,
     ).run(call.id);
-    db.exec(migrations.slice(-4).join("\n"));
+    db.exec(migrations.slice(-5).join("\n"));
     expect(retiredWorkers(db, Date.now())).toEqual([
       { threadId: "legacy-worker", callId: call.id },
     ]);
@@ -143,7 +165,7 @@ describe("workflow durable data", () => {
     db.close();
     db = new Database(":memory:");
     db.pragma("foreign_keys = ON");
-    db.exec(migrations.slice(0, -4).join("\n"));
+    db.exec(migrations.slice(0, -5).join("\n"));
     const run = newRun();
     const insertCall = db.prepare(
       `INSERT INTO workflow_calls(id, run_id, call_index, cache_key, prompt,
@@ -160,7 +182,7 @@ describe("workflow durable data", () => {
         `worker-${String(index).padStart(3, "0")}`,
       );
     const migratedAt = Date.now();
-    db.exec(migrations.slice(-4).join("\n"));
+    db.exec(migrations.slice(-5).join("\n"));
 
     const buckets = db
       .prepare(

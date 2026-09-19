@@ -304,8 +304,8 @@ Permissions are provider permissions, not filesystem confinement or read-only
 access. Canonical equal/ancestor workspace roots on the same host serialize;
 distinct local worktrees run concurrently. Missing roots or host canonicalization
 fail before execution. Each assignment preserves its own native call/thread,
-result and failure. Guidance targets one running assignment and records only
-submission, never compliance.
+result and failure. Guidance targets one running assignment and records submitted
+or uncertain delivery, never compliance.
 
 Start is idempotent across concurrent calls and plugin restarts; changing the
 request under the same identity fails. Native spawn intent is durable before
@@ -318,3 +318,28 @@ attempts have confirmed stop. `nativeSettlement` and `stopConfirmed` report nati
 thread settlement only; they do not prove detached processes have stopped.
 Execution identity history is retained indefinitely until bounded tombstones are
 implemented, so retention cannot silently reuse an old launch identity.
+
+### Durable guidance and bounded group wait
+
+Guidance requires a caller-generated `guidanceId` in addition to execution identity,
+assignment, message and mode. Workflows persists an `uncertain` receipt before
+native send and changes it to `submitted` only after the send API returns. The
+same guidance ID and payload returns the stored receipt without sending again;
+a changed payload is rejected. A lost response or plugin restart leaves the
+receipt uncertain and never causes an automatic resend. Read it with
+`experimental_executionGuideStatus` using execution identity plus guidanceId.
+Neither receipt state proves native acknowledgement or compliance; compliance
+always remains `unverified`. A deliberate additional correction needs a new ID.
+
+`experimental_executionWait` accepts `targets` (1–32 execution identities, each
+with numeric `afterCursor`, initially 0) and `timeoutMs` (0–30000). It returns the
+first new terminal assignment/run event, updated per-target `cursors`, and
+`timedOut`; a timeout has a null event. Pass each returned cursor as afterCursor
+on the next wait. Events persist across restart, so retrying with an old cursor
+replays the same event. The implementation subscribes to native service changes
+and reads indexed SQLite events; it creates no scheduler or polling loop.
+Returned output is at most 2048 UTF-8 bytes and error at most 1024, with explicit
+truncation flags. These are completion observations, not acceptance or native
+settlement guarantees; inspect the execution for `nativeSettlement`. Failed
+provider attempts under automatic retry are not published as final assignment
+failures. Discover both RPC schemas or invoke them using `bb plugin rpc call`.

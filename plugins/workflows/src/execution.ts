@@ -1,3 +1,4 @@
+import { createExecutionSupervision } from "./execution-supervision.js";
 import { workflowHostContract } from "./host-contract.js";
 import { createHash } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -208,6 +209,21 @@ export function registerExecutionRpc(
     });
     return inspect(input);
   }
+  const supervision = createExecutionSupervision(
+    bb,
+    db,
+    service,
+    inspect,
+    (identity) => {
+      const runId = executionRunId(identity);
+      if (
+        db.prepare("SELECT 1 FROM workflow_runs WHERE id = ?").get(runId) ===
+        undefined
+      )
+        throw new Error("Unknown execution identity");
+      return runId;
+    },
+  );
   bb.rpc.register(
     workflowExecutionRpcContract,
     {
@@ -246,24 +262,9 @@ export function registerExecutionRpc(
           .get(snapshot.runId);
         return { ...inspect(input), stopConfirmed: unresolved === undefined };
       },
-      async experimental_executionGuide(input) {
-        const snapshot = inspect(input);
-        const assignment = snapshot.assignments.find(
-          (entry) => entry.id === input.assignmentId,
-        );
-        if (!assignment?.threadId || assignment.status !== "running")
-          throw new Error("Assignment has no running native worker");
-        await bb.sdk.threads.send({
-          threadId: assignment.threadId,
-          input: [{ type: "text", text: input.message, mentions: [] }],
-          mode: input.mode === "steer" ? "steer" : "queue-if-active",
-        });
-        return {
-          threadId: assignment.threadId,
-          delivery: "submitted" as const,
-          compliance: "unverified" as const,
-        };
-      },
+      experimental_executionGuide: supervision.guide,
+      experimental_executionGuideStatus: supervision.guideStatus,
+      experimental_executionWait: supervision.wait,
     },
     {
       experimental_discoverable: true,
