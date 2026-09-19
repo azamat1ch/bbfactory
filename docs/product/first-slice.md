@@ -44,6 +44,14 @@ Team composition, guidance and usage, plus their typechecks and the full build.
 
 ## Remaining acceptance
 
+The living-spec follow-up adds a draft/start boundary, evidence-backed agent
+reviews, atomic human review batches, versioned notes, a larger-spec card and
+individual provider controls. Focused backend and provider checks passed; the
+final card and combined result still need verification. Test/build suites and
+the isolated QA app were stopped at the user's request to protect host memory.
+Do not treat the earlier integrated-app evidence above as acceptance of these
+new changes. Subsequent verification must use bounded, serialized checks.
+
 Complete a real feature through the running app: agree requirements, implement
 directly or delegate, review, correct findings, and verify the final integrated
 content. Exercise restart and uncertain stop through the same runtime. A canned

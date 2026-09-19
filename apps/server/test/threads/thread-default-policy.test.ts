@@ -150,31 +150,36 @@ describe("resolveCreateThreadExecutionDefaults", () => {
     ).toBe("pi");
   });
 
-  it("rejects a disabled saved global default without blocking an explicit enabled provider", async () => {
-    const userRegistry = createProviderRegistryService({
-      readUserProviderPreferences: () => ({
-        providerOrder: ["acp-devin", "codex"],
-        defaultProviderId: "codex",
-      }),
-    });
-    await registerFirstPartyProviders(userRegistry);
+  it.each([true, false])(
+    "rejects a disabled saved global default (available: %s) without blocking an explicit enabled provider",
+    async (available) => {
+      const userRegistry = createProviderRegistryService({
+        readUserProviderPreferences: () => ({
+          providerOrder: ["acp-devin", "codex"],
+          defaultProviderId: "codex",
+        }),
+      });
+      await registerFirstPartyProviders(userRegistry, {
+        unavailablePluginIds: available ? [] : ["provider-codex"],
+      });
 
-    expect(() =>
-      resolveCreateThreadExecutionDefaults(userRegistry, {
-        disabledProviderIds: ["codex"],
-        storedDefaults: null,
-      }),
-    ).toThrow(
-      "Provider 'codex' is disabled. Enable it in Settings → Providers before starting new work.",
-    );
-    expect(
-      resolveCreateThreadExecutionDefaults(userRegistry, {
-        disabledProviderIds: ["codex"],
-        requestedProviderId: "acp-devin",
-        storedDefaults: null,
-      }).providerId,
-    ).toBe("acp-devin");
-  });
+      expect(() =>
+        resolveCreateThreadExecutionDefaults(userRegistry, {
+          disabledProviderIds: ["codex"],
+          storedDefaults: null,
+        }),
+      ).toThrow(
+        "Provider 'codex' is disabled. Enable it in Settings → Providers before starting new work.",
+      );
+      expect(
+        resolveCreateThreadExecutionDefaults(userRegistry, {
+          disabledProviderIds: ["codex"],
+          requestedProviderId: "acp-devin",
+          storedDefaults: null,
+        }).providerId,
+      ).toBe("acp-devin");
+    },
+  );
 
   it("orders fallback candidates behind the chosen default, preferred provider first", async () => {
     const preferences = {

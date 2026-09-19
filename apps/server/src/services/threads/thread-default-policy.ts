@@ -42,7 +42,10 @@ function listDefaultProviderIdCandidates(
     .filter((registration) => registration.info.available)
     .map((registration) => registration.info.id);
   const preferred = registry.getUserDefaultProviderId();
-  if (preferred !== null && available.includes(preferred)) {
+  if (
+    preferred !== null &&
+    (available.includes(preferred) || disabledProviderIds.includes(preferred))
+  ) {
     return [
       preferred,
       ...available.filter(

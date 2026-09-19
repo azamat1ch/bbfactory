@@ -23,6 +23,15 @@ proof. [Acceptance](acceptance.md) defines the gates. Consult the large
 [parity map](parity-map.md) and [source inventory](coverage.md) only for a behavior
 under review. [Provenance](provenance.md) preserves upstream attribution and history.
 
+## Living-spec changes awaiting integrated acceptance
+
+The living-spec branch adds provider enablement controls, draft/start lifecycle,
+three acceptance methods, grouped human decisions, versioned notes and a compact
+card for large requirement sets. Backend and provider-focused tests passed before
+the user requested a stop to protect host memory. Final UI and combined verification
+remain pending; the new feature is not yet accepted or deployed to the active app.
+See [integration notes](../tmp/2026.09.20_factory-integration_deviations.md).
+
 ## Where specifications live
 
 The repository's [spec.md](spec.md) is the product contract. Per-task specs and

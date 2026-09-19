@@ -63,7 +63,9 @@ A minimal direct-work specification is:
 
 Replace all example placeholders with verified project values. Every check must
 reference real requirements and actual project checks. Given/When/Then is prose
-unless exercised by a check. `verify` takes `{ "taskId": "<id>" }` and runs the
+unless exercised by a check. Creation saves a draft. Once the scope is agreed,
+`start` takes taskId and expectedVersion and activates that same task without
+launching workers. `verify` takes `{ "taskId": "<id>" }` and runs the
 declared checks independently of worker claims. `status` takes the same input.
 An `update` includes expectedVersion, the complete spec, and changeReason;
 changed requirements/checks require fresh evidence. Human criteria use `judge`
