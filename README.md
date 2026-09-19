@@ -10,9 +10,10 @@ communication, retries and review.
 
 **Current status:** one bundled Factory feature combines the existing Team picker,
 Pragmatic guidance, native assignments and requirement-linked checks. Workflows
-owns delegated execution. Automated checks cover the individual runtime slices,
-UI and Team upgrade; real-provider end-to-end delivery and full upstream behavior
-parity remain acceptance work. See [status](docs/product/README.md).
+owns delegated execution. The live app upgrade, a real native worker assignment
+and requirement-linked browser verification have been exercised. Complete
+autonomous feature delivery and full upstream behavior parity remain acceptance
+work. See [status](docs/product/README.md).
 
 ## Run this checkout
 

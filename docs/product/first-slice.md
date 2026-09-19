@@ -31,6 +31,17 @@ previous evidence stale; rerunning from the task panel restored acceptance for
 the new fingerprint. This demonstrates the records/check/UI path, not autonomous
 feature delivery or a full provider recovery matrix.
 
+The existing installation was then upgraded without resetting conversations or
+Team preferences. A real Codex/Astra research assignment launched through Factory
+and Workflows, returned its source-based result, and produced a durable completion
+event. Worker success left the task unverified; running the linked Provider Usage
+suite from the browser produced acceptance. Factory, Workflows, Provider Usage
+and Account Pooler were running together. Live Codex and Devin limits were observed;
+only one Codex account was available, so account fallback was not exercised.
+
+The combined gate passed 340 tests across Workflows, Factory records/host/UI,
+Team composition, guidance and usage, plus their typechecks and the full build.
+
 ## Remaining acceptance
 
 Complete a real feature through the running app: agree requirements, implement
