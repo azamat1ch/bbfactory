@@ -4,13 +4,20 @@ import { Icon } from "@bb/shared-ui/icon";
 import { useBbNavigate, useComposer, useRpc } from "@get-bb/plugin-sdk/app";
 import type { FactoryTaskDetail, factoryRpcContract } from "./shared.js";
 import {
+  ArtifactList,
   ErrorNotice,
   Status,
   message,
   time,
   type RunAction,
 } from "./app-primitives.js";
-import { RequirementRow } from "./app-requirements.js";
+import { RequirementNavigator } from "./app-requirements.js";
+import { HumanReviewPanel } from "./app-review.js";
+import {
+  currentFingerprint,
+  requirementStatus,
+  specDelta,
+} from "./app-status.js";
 
 type Finding = FactoryTaskDetail["findings"][number];
 
@@ -95,6 +102,181 @@ function FindingRow({
   );
 }
 
+function TeamPlan({ detail }: { detail: FactoryTaskDetail }) {
+  const plan = detail.task.teamPlan;
+  return (
+    <details className="factory-section">
+      <summary>
+        <h3>Proposed team</h3>
+        <span className="factory-meta">
+          {plan.length
+            ? `${plan.length} proposed`
+            : "None proposed"}
+        </span>
+      </summary>
+      {plan.length === 0 ? (
+        <p className="factory-note">No team proposal in this spec.</p>
+      ) : (
+        <>
+          <p className="factory-note">
+            Proposal only — actual work appears under Assignments.
+          </p>
+          <div className="factory-group">
+            {plan.map((item) => (
+              <details className="factory-assignment" key={item.id}>
+                <summary>
+                  <span className="factory-grow">
+                    {item.title}
+                    <span className="factory-meta factory-block">
+                      {item.role} · {item.profile.providerId}/
+                      {item.profile.model} ·{" "}
+                      {item.requirementIds.length}{" "}
+                      {item.requirementIds.length === 1
+                        ? "requirement"
+                        : "requirements"}
+                    </span>
+                  </span>
+                </summary>
+                <div className="factory-inset">
+                  {item.rationale && (
+                    <p className="factory-note">{item.rationale}</p>
+                  )}
+                  <dl className="factory-properties">
+                    <dt>Profile</dt>
+                    <dd>
+                      {item.profile.providerId} · {item.profile.model} ·{" "}
+                      {item.profile.reasoningLevel} ·{" "}
+                      {item.profile.serviceTier}
+                    </dd>
+                    <dt>Requirements</dt>
+                    <dd>{item.requirementIds.join(" · ") || "None"}</dd>
+                  </dl>
+                </div>
+              </details>
+            ))}
+          </div>
+        </>
+      )}
+    </details>
+  );
+}
+
+function Notes({ detail }: { detail: FactoryTaskDetail }) {
+  const notes = [...detail.notes].sort((a, b) => b.createdAt - a.createdAt);
+  const kindLabel = {
+    note: "Note",
+    decision: "Decision",
+    blocker: "Blocker",
+    conclusion: "Conclusion",
+  } as const;
+  return (
+    <details
+      className="factory-section"
+      open={notes.some((note) => note.kind === "conclusion")}
+    >
+      <summary>
+        <h3>Notes &amp; artifacts</h3>
+        <span className="factory-meta">{notes.length || "None"}</span>
+      </summary>
+      {notes.length === 0 ? (
+        <p className="factory-note">No notes recorded.</p>
+      ) : (
+        <ul className="factory-notes">
+          {notes.map((note) => (
+            <li
+              key={note.id}
+              className={`factory-note-item factory-note-${note.kind}`}
+            >
+              <div className="factory-check-heading">
+                <strong>{kindLabel[note.kind]}</strong>
+                <span className="factory-meta">
+                  v{note.specVersion}
+                  {note.fingerprint
+                    ? ` · ${note.fingerprint.slice(0, 12)}`
+                    : ""}{" "}
+                  · {time(note.createdAt)}
+                </span>
+              </div>
+              <p className="factory-note">{note.text}</p>
+              <ArtifactList refs={note.artifactRefs} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
+  );
+}
+
+function SpecHistory({ detail }: { detail: FactoryTaskDetail }) {
+  const versions = [...detail.specs].sort((a, b) => b.version - a.version);
+  return (
+    <details className="factory-section">
+      <summary>
+        <h3>Spec history</h3>
+        <span className="factory-meta">
+          v{detail.task.specVersion} · {versions.length}{" "}
+          {versions.length === 1 ? "version" : "versions"}
+        </span>
+      </summary>
+      <ol className="factory-history">
+        {versions.map((version, index) => {
+          const previous = versions[index + 1]?.spec ?? null;
+          return (
+            <li key={version.version}>
+              <details>
+                <summary>
+                  <strong>v{version.version}</strong>
+                  <span className="factory-grow">
+                    {version.changeReason || "Initial specification"}
+                    <span className="factory-meta factory-block">
+                      {specDelta(version.spec, previous)} ·{" "}
+                      {time(version.createdAt)}
+                    </span>
+                  </span>
+                </summary>
+                <p className="factory-note">{version.spec.goal}</p>
+                {version.spec.problem && (
+                  <p className="factory-note">{version.spec.problem}</p>
+                )}
+                {version.spec.outcome && (
+                  <p className="factory-note">{version.spec.outcome}</p>
+                )}
+                <ul>
+                  {version.spec.requirements.map((requirement) => (
+                    <li key={requirement.id}>
+                      <strong>{requirement.id}</strong> {requirement.text}
+                    </li>
+                  ))}
+                </ul>
+                {version.spec.checks.map((check) => (
+                  <div className="factory-check" key={check.id}>
+                    <div className="factory-check-heading">
+                      <strong>{check.id}</strong>
+                      <span className="factory-meta">
+                        {check.required ? "Required" : "Optional"}
+                      </span>
+                    </div>
+                    <p className="factory-meta">
+                      {check.requirementIds.join(" · ")}
+                    </p>
+                    <p className="factory-mono">{check.testRef}</p>
+                    <code className="factory-command">
+                      {check.argv.join(" ")}
+                    </code>
+                  </div>
+                ))}
+              </details>
+            </li>
+          );
+        })}
+      </ol>
+      {!versions.length && (
+        <p className="factory-note">Spec history unavailable.</p>
+      )}
+    </details>
+  );
+}
+
 export function TaskDetail({
   detail,
   replace,
@@ -110,6 +292,7 @@ export function TaskDetail({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editDrafted, setEditDrafted] = useState(false);
+  const [reviewDrafted, setReviewDrafted] = useState(false);
   const actionRunning = useRef<string | null>(null);
   const stopRunning = useRef(false);
   const actionSequence = useRef(0);
@@ -143,6 +326,26 @@ export function TaskDetail({
   const blocked = detail.findings.filter(
     (finding) => finding.required && !finding.resolution,
   ).length;
+  const draft = task.phase === "draft";
+  const active = task.phase === "active";
+  const agentPending = task.requirements.filter(
+    (requirement) =>
+      requirement.criterion === "agent" &&
+      requirementStatus(requirement, detail) !== "accepted",
+  );
+  const fingerprint = currentFingerprint(detail);
+  const statusLine = unavailable
+    ? "Live updates are unavailable. Records below may be out of date."
+    : error
+      ? "Action failed. Run checks to refresh current acceptance."
+      : [
+            task.statusDetail,
+            active && fingerprint === null
+              ? "Current result content is not fully captured; recorded statuses may not apply to the current result."
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
   return (
     <div className="factory-detail">
       <div className="factory-detail-scroll">
@@ -151,46 +354,91 @@ export function TaskDetail({
             Spec v{task.specVersion}
             {task.archived ? " · Archived" : ""}
           </span>
-          {unavailable || error ? (
-            <span className="factory-meta">Status unavailable</span>
-          ) : busy === "verify" || busy === "stop" ? (
+          {unavailable || error ? null : busy === "verify" ||
+            busy === "stop" ? (
             <span className="factory-meta">
-              {busy === "stop" ? "Stopping…" : "Checking current content…"}
+              {busy === "stop" ? "Stopping…" : "Running checks…"}
             </span>
+          ) : draft ? (
+            <Status value="draft" />
           ) : (
             <Status value={task.status} />
           )}
         </header>
         <h2>{task.goal}</h2>
-        <p className="factory-status-detail">
-          {unavailable
-            ? "Connection unavailable. Displayed records may be out of date."
-            : error
-              ? "Action failed. Verify to refresh current acceptance."
-              : task.statusDetail}
-        </p>
+        <p className="factory-status-detail">{statusLine}</p>
+        {error && <ErrorNotice text={error} />}
         {task.stopRequested && (
           <p className="factory-note">
             Stop requested. Native assignment status below records the outcome.
           </p>
         )}
-        {error && <ErrorNotice text={error} />}
-        <p className="factory-scope">{task.scope}</p>
+        {(task.problem || task.outcome) && (
+          <div className="factory-brief">
+            {task.problem && (
+              <p>
+                <span className="factory-brief-label">Problem</span>
+                {task.problem}
+              </p>
+            )}
+            {task.outcome && (
+              <p>
+                <span className="factory-brief-label">Outcome</span>
+                {task.outcome}
+              </p>
+            )}
+          </div>
+        )}
+        <details className="factory-section">
+          <summary>
+            <h3>Scope</h3>
+            <span className="factory-meta">{task.environmentId}</span>
+          </summary>
+          <p className="factory-scope">{task.scope}</p>
+        </details>
+        {draft && (
+          <section className="factory-stage">
+            <div className="factory-check-heading">
+              <h3>Draft — not started</h3>
+              <Status value="draft" />
+            </div>
+            <p className="factory-note">
+              Review the requirements and scope. Starting activates the task
+              against its target environment; it does not launch workers.
+            </p>
+            <dl className="factory-properties">
+              <dt>Target environment</dt>
+              <dd className="factory-mono">{task.environmentId}</dd>
+            </dl>
+            <div className="factory-actions">
+              <Button
+                type="button"
+                size="sm"
+                disabled={busy !== null || unavailable || task.archived}
+                onClick={() =>
+                  void run("start", () =>
+                    rpc.call("factoryStartTask", {
+                      taskId: task.id,
+                      expectedVersion: task.specVersion,
+                    }),
+                  )
+                }
+              >
+                {busy === "start" ? "Starting…" : "Start task"}
+              </Button>
+            </div>
+          </section>
+        )}
         <div className="factory-section-heading">
           <h3>Requirements</h3>
           <span className="factory-meta">{task.requirements.length}</span>
         </div>
-        <div className="factory-group">
-          {task.requirements.map((requirement) => (
-            <RequirementRow
-              key={`${task.specVersion}:${requirement.id}`}
-              requirement={requirement}
-              detail={detail}
-              busy={busy !== null || unavailable}
-              run={run}
-            />
-          ))}
-        </div>
+        <RequirementNavigator detail={detail} />
+        <HumanReviewPanel
+          detail={detail}
+          busy={busy !== null || unavailable}
+          run={run}
+        />
         <details className="factory-section" open={blocked > 0}>
           <summary>
             <h3>Review findings</h3>
@@ -215,6 +463,7 @@ export function TaskDetail({
             )}
           </div>
         </details>
+        <TeamPlan detail={detail} />
         <details
           className="factory-section"
           open={detail.assignments.length > 0}
@@ -286,9 +535,7 @@ export function TaskDetail({
                         <Icon name="ArrowUpRight" className="size-3" />
                       </Button>
                     ) : (
-                      <p className="factory-note">
-                        No native thread linked yet.
-                      </p>
+                      <p className="factory-note">No native thread linked yet.</p>
                     )}
                   </div>
                 </details>
@@ -296,85 +543,45 @@ export function TaskDetail({
             </div>
           )}
         </details>
-        <details className="factory-section">
-          <summary>
-            <h3>Spec history</h3>
-            <span className="factory-meta">v{task.specVersion}</span>
-          </summary>
-          <ol className="factory-history">
-            {[...detail.specs]
-              .sort((a, b) => b.version - a.version)
-              .map((version) => (
-                <li key={version.version}>
-                  <details>
-                    <summary>
-                      <strong>v{version.version}</strong>
-                      <span className="factory-grow">
-                        {version.changeReason || "Initial specification"}
-                      </span>
-                    </summary>
-                    <span className="factory-meta">
-                      {time(version.createdAt)}
-                    </span>
-                    <p className="factory-note">{version.spec.goal}</p>
-                    <p className="factory-note">{version.spec.scope}</p>
-                    <ul>
-                      {version.spec.requirements.map((requirement) => (
-                        <li key={requirement.id}>
-                          <strong>{requirement.id}</strong> {requirement.text}
-                        </li>
-                      ))}
-                    </ul>
-                    {version.spec.scenarios.map((scenario) => (
-                      <dl className="factory-scenario" key={scenario.id}>
-                        <dt>Given</dt>
-                        <dd>{scenario.given}</dd>
-                        <dt>When</dt>
-                        <dd>{scenario.when}</dd>
-                        <dt>Then</dt>
-                        <dd>{scenario.then}</dd>
-                      </dl>
-                    ))}
-                    {version.spec.checks.map((check) => (
-                      <div className="factory-check" key={check.id}>
-                        <div className="factory-check-heading">
-                          <strong>{check.id}</strong>
-                          <span className="factory-meta">
-                            {check.required ? "Required" : "Optional"}
-                          </span>
-                        </div>
-                        <p className="factory-meta">
-                          {check.requirementIds.join(" · ")}
-                        </p>
-                        <p className="factory-mono">{check.testRef}</p>
-                        <code className="factory-command">
-                          {check.argv.join(" ")}
-                        </code>
-                      </div>
-                    ))}
-                  </details>
-                </li>
-              ))}
-          </ol>
-          {!detail.specs.length && (
-            <p className="factory-note">Spec history unavailable.</p>
-          )}
-        </details>
+        <Notes detail={detail} />
+        <SpecHistory detail={detail} />
       </div>
       <footer className="factory-footer">
         <div className="factory-actions">
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy !== null || unavailable || task.archived}
-            onClick={() =>
-              void run("verify", () =>
-                rpc.call("factoryVerifyTask", { taskId: task.id }),
-              )
-            }
-          >
-            {busy === "verify" ? "Verifying…" : "Verify current content"}
-          </Button>
+          {active && !task.stopRequested && task.checks.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy !== null || unavailable || task.archived}
+              onClick={() =>
+                void run("verify", () =>
+                  rpc.call("factoryVerifyTask", { taskId: task.id }),
+                )
+              }
+            >
+              {busy === "verify" ? "Running checks…" : "Run checks"}
+            </Button>
+          )}
+          {active &&
+            !task.stopRequested &&
+            agentPending.length > 0 &&
+            !task.archived && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                composer.addQuote(
+                  `Agent review requested for Factory task ${task.id} (spec v${task.specVersion}): ${agentPending
+                    .map((requirement) => requirement.id)
+                    .join(", ")}. Goal: ${task.goal}`,
+                );
+                setReviewDrafted(true);
+              }}
+            >
+              Request agent review
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -414,6 +621,12 @@ export function TaskDetail({
         {editDrafted && (
           <p role="status" className="factory-meta">
             Task reference added to chat. Describe your changes and send.
+          </p>
+        )}
+        {reviewDrafted && (
+          <p role="status" className="factory-meta">
+            Review request added to chat. Send it to ask your lead for an agent
+            review.
           </p>
         )}
       </footer>
