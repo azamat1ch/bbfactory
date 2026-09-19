@@ -1,6 +1,6 @@
 import { findProviderEnvironmentContainingPath } from "@bb/db";
-import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { isBbManagedWorkspacePath } from "../threads/workspace-paths.js";
 import {
   getInstalledPlugin,
@@ -52,6 +52,38 @@ import {
   type NpmSourceIntentForResolution,
   type PluginResolvedUpdateVersion,
 } from "./update-resolver.js";
+
+function relocatedFactorySource(
+  existing: InstalledPluginRow | undefined,
+  name: string,
+): boolean {
+  if (
+    !existing ||
+    existing.id !== "factory-team" ||
+    name !== "factory" ||
+    !existing.source.startsWith("path:") ||
+    basename(existing.rootDir) !== "factory-team" ||
+    basename(dirname(existing.rootDir)) !== "plugins" ||
+    existsSync(join(existing.rootDir, "package.json"))
+  )
+    return false;
+  try {
+    const manifest: unknown = JSON.parse(
+      readFileSync(
+        join(dirname(existing.rootDir), "factory", "package.json"),
+        "utf8",
+      ),
+    );
+    return (
+      typeof manifest === "object" &&
+      manifest !== null &&
+      "name" in manifest &&
+      manifest.name === "bb-plugin-factory-team"
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function pluginInstalledTelemetryEvent(
   pluginId: string,
@@ -288,7 +320,11 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
         identity.provenance,
         identity.sourceIntent,
       ) &&
-      pathSourceMoveFrom(existing, identity) === undefined
+      pathSourceMoveFrom(existing, identity) === undefined &&
+      !(
+        identity.sourceIntent.kind === "builtin" &&
+        relocatedFactorySource(existing, identity.sourceIntent.name)
+      )
     ) {
       throw new Error(
         `plugin id "${pluginId}" is already installed from ${existing.source}; remove it first`,
@@ -337,7 +373,12 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     await withLifecycleLock(manifest.id, async () => {
       const existing = getInstalledPlugin(deps.db, manifest.id);
       assertInstallRegistrationAvailable(existing, args, manifest.id);
-      const movedFrom = pathSourceMoveFrom(existing, args);
+      const movedFrom =
+        pathSourceMoveFrom(existing, args) ??
+        (args.sourceIntent.kind === "builtin" &&
+        relocatedFactorySource(existing, args.sourceIntent.name)
+          ? existing
+          : undefined);
       await disposeOne(manifest.id);
       try {
         await args.beforePersist?.();
@@ -665,6 +706,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
       if (
         existing !== undefined &&
         !sameBundledSource &&
+        !relocatedFactorySource(existing, bundled.name) &&
         !rowMatchesInstallSource(existing, provenance, {
           kind: "builtin",
           name: bundled.name,
