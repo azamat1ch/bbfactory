@@ -177,6 +177,11 @@ export const BUILTIN_PLUGINS = [
     pluginId: "workflows",
     defaultEnabled: false,
   },
+  {
+    name: "bbfactory",
+    pluginId: "bbfactory",
+    defaultEnabled: false,
+  },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,
   autoInstall: true,

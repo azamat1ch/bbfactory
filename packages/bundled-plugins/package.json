@@ -12,6 +12,7 @@
     "bb-plugin-ask-user-question": "workspace:*",
     "bb-plugin-automations": "workspace:*",
     "bb-plugin-bb-guide": "workspace:*",
+    "bb-plugin-bbfactory": "workspace:*",
     "bb-plugin-browser-automation": "workspace:*",
     "bb-plugin-concurrency-limit": "workspace:*",
     "bb-plugin-connect": "workspace:*",
