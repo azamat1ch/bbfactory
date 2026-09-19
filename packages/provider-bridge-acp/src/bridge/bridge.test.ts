@@ -1342,6 +1342,159 @@ describe("acp bridge", () => {
     expect(agentMessageTexts()).toContain("selected-model:fake/strong");
   });
 
+  it.each<Record<string, string>>([
+    { FAKE_ACP_MODEL_CONFIG: "1" },
+    { FAKE_ACP_MODELS_FIELD: "1" },
+  ])(
+    "keeps an already-current ACP-native model without a selection request",
+    async (envVars) => {
+      const requestLog = join(workspaceDir, "current-model-requests.jsonl");
+      const { providerThreadId } = await startThread({
+        envVars: { ...envVars, FAKE_ACP_REQUEST_LOG: requestLog },
+        model: "fake/default",
+      });
+
+      sendTurnRequest("turn/start", providerThreadId, {
+        input: [{ type: "text", text: "echo-selected-model", mentions: [] }],
+      });
+      await waitForTurnCompleted();
+
+      expect(agentMessageTexts()).toContain("selected-model:fake/default");
+      expect(
+        loggedAcpRequests(requestLog).filter(
+          (request) =>
+            request.method === "session/set_model" ||
+            (request.method === "session/set_config_option" &&
+              request.params?.["configId"] === "model"),
+        ),
+      ).toEqual([]);
+    },
+  );
+
+  it("fails before the first prompt when the requested ACP-native model is not advertised", async () => {
+    const requestLog = join(workspaceDir, "unlisted-model-requests.jsonl");
+    const failure = await startThread({
+      envVars: {
+        FAKE_ACP_MODELS_FIELD: "1",
+        FAKE_ACP_REQUEST_LOG: requestLog,
+      },
+      model: "fake/missing",
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    const message = (failure as Error).message;
+    expect(message).toContain('requested model "fake/missing"');
+    expect(message).toContain("fake/default, fake/strong");
+    const requests = loggedAcpRequests(requestLog);
+    expect(
+      requests.some(
+        (request) =>
+          request.method === "session/set_model" &&
+          request.params?.["modelId"] === "fake/missing",
+      ),
+    ).toBe(true);
+    expect(requests.some((request) => request.method === "session/prompt")).toBe(
+      false,
+    );
+  });
+
+  it("fails clearly when the agent advertises no model selection surface", async () => {
+    const requestLog = join(workspaceDir, "no-model-surface-requests.jsonl");
+    const failure = await startThread({
+      envVars: { FAKE_ACP_REQUEST_LOG: requestLog },
+      model: "fake/strong",
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    const message = (failure as Error).message;
+    expect(message).toContain('requested model "fake/strong"');
+    expect(message).toContain("did not advertise");
+    expect(
+      loggedAcpRequests(requestLog).some(
+        (request) => request.method === "session/prompt",
+      ),
+    ).toBe(false);
+  });
+
+  it("fails when session/set_model reports a different current model", async () => {
+    const requestLog = join(workspaceDir, "noop-set-model-requests.jsonl");
+    const failure = await startThread({
+      envVars: {
+        FAKE_ACP_MODELS_FIELD: "1",
+        FAKE_ACP_SET_MODEL_NOOP: "1",
+        FAKE_ACP_REQUEST_LOG: requestLog,
+      },
+      model: "fake/missing",
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain(
+      'still reports model "fake/default"',
+    );
+    expect(
+      loggedAcpRequests(requestLog).some(
+        (request) => request.method === "session/prompt",
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts an advertised ACP-native model when session/set_model returns no state", async () => {
+    const { providerThreadId } = await startThread({
+      envVars: {
+        FAKE_ACP_MODELS_FIELD: "1",
+        FAKE_ACP_SET_MODEL_BARE_RESULT: "1",
+      },
+      model: "fake/strong",
+    });
+
+    sendTurnRequest("turn/start", providerThreadId, {
+      input: [{ type: "text", text: "echo-selected-model", mentions: [] }],
+    });
+    await waitForTurnCompleted();
+
+    expect(agentMessageTexts()).toContain("selected-model:fake/strong");
+  });
+
+  it("trusts a bare session/set_model success when the agent advertises no catalog", async () => {
+    const { providerThreadId } = await startThread({
+      envVars: { FAKE_ACP_SET_MODEL_BARE_RESULT: "1" },
+      model: "fake/unlisted",
+    });
+
+    sendTurnRequest("turn/start", providerThreadId, {
+      input: [{ type: "text", text: "echo-selected-model", mentions: [] }],
+    });
+    await waitForTurnCompleted();
+
+    expect(agentMessageTexts()).toContain("selected-model:fake/unlisted");
+  });
+
+  it("establishes an unadvertised ACP-native model when the agent confirms it", async () => {
+    const { providerThreadId } = await startThread({
+      envVars: {
+        FAKE_ACP_MODELS_FIELD: "1",
+        FAKE_ACP_SET_MODEL_ACCEPT_UNLISTED: "1",
+      },
+      model: "fake/unlisted",
+    });
+
+    sendTurnRequest("turn/start", providerThreadId, {
+      input: [{ type: "text", text: "echo-selected-model", mentions: [] }],
+    });
+    await waitForTurnCompleted();
+
+    expect(agentMessageTexts()).toContain("selected-model:fake/unlisted");
+  });
+
   it("selects ACP-native reasoning with session/set_config_option before the first prompt", async () => {
     const { providerThreadId } = await startThread({
       envVars: {

@@ -34,6 +34,15 @@
  *                            → fail session/set_config_option for model values
  * - FAKE_ACP_SET_CONFIG_FAST_ERROR=1
  *                            → fail session/set_config_option for Fast values
+ * - FAKE_ACP_SET_MODEL_ACCEPT_UNLISTED=1
+ *                            → accept session/set_model ids outside the
+ *                              advertised catalog and report them as current
+ * - FAKE_ACP_SET_MODEL_BARE_RESULT=1
+ *                            → answer session/set_model with a null result
+ *                              that carries no model state (implies unlisted)
+ * - FAKE_ACP_SET_MODEL_NOOP=1
+ *                            → accept session/set_model but keep reporting the
+ *                              previous current model (implies unlisted)
  * - FAKE_ACP_CURSOR_PARAMETERIZED_MODELS=1
  *                            → mirror Cursor compatibility-vs-parameterized
  *                              model/config-option responses
@@ -85,6 +94,11 @@ const acceptNativeReasoning =
   process.env.FAKE_ACP_ACCEPT_NATIVE_REASONING === "1";
 const setConfigModelError = process.env.FAKE_ACP_SET_CONFIG_MODEL_ERROR === "1";
 const setConfigFastError = process.env.FAKE_ACP_SET_CONFIG_FAST_ERROR === "1";
+const setModelAcceptUnlisted =
+  process.env.FAKE_ACP_SET_MODEL_ACCEPT_UNLISTED === "1";
+const setModelBareResult =
+  process.env.FAKE_ACP_SET_MODEL_BARE_RESULT === "1";
+const setModelNoop = process.env.FAKE_ACP_SET_MODEL_NOOP === "1";
 const cursorParameterizedModels =
   process.env.FAKE_ACP_CURSOR_PARAMETERIZED_MODELS === "1";
 const requestLog = process.env.FAKE_ACP_REQUEST_LOG;
@@ -719,13 +733,19 @@ async function handleMessage(message) {
       return;
     case "session/set_model": {
       const modelId = message.params?.modelId;
+      const acceptsUnlisted =
+        setModelAcceptUnlisted || setModelBareResult || setModelNoop;
       const availableModels = cursorParameterizedModels
         ? cursorModelOptions()
         : fakeModels;
       if (
-        (!cursorParameterizedModels && !modelConfig && !modelsField) ||
+        (!cursorParameterizedModels &&
+          !modelConfig &&
+          !modelsField &&
+          !acceptsUnlisted) ||
         typeof modelId !== "string" ||
-        !availableModels.some((model) => model.value === modelId)
+        (!acceptsUnlisted &&
+          !availableModels.some((model) => model.value === modelId))
       ) {
         send({
           jsonrpc: "2.0",
@@ -734,8 +754,14 @@ async function handleMessage(message) {
         });
         return;
       }
-      selectedModel = modelId;
-      send({ jsonrpc: "2.0", id: message.id, result: configState() });
+      if (!setModelNoop) {
+        selectedModel = modelId;
+      }
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: setModelBareResult ? null : configState(),
+      });
       return;
     }
     case "session/set_config_option": {
