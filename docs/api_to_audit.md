@@ -3202,3 +3202,33 @@ remain forbidden. New-machine selections continue through creation.
 
 Stabilization requires lifecycle coverage for reuse, missing paths, cleanup in
 progress, cross-project ownership, and concurrent creation before binding.
+
+## Native Workflows execution RPC
+
+`builtin:workflows` publishes `experimental_executionStart`,
+`experimental_executionInspect`, `experimental_executionCancel` and
+`experimental_executionGuide`. The schemas live in
+`plugins/workflows/src/execution-contract.ts`; discover them through
+`bb plugin rpc inspect builtin:workflows` and invoke through
+`bb.sdk.plugins.callRpc` or `bb plugin rpc call`.
+
+Start binds `(originThreadId, callerTaskId, launchId)` to one immutable request
+and native run. Each assignment explicitly selects provider, model, reasoning,
+service tier, existing native environment and permission mode. Scope is advisory.
+A Workflows host module canonicalizes workspace roots; equal or ancestor roots
+on the same host serialize, while distinct worktrees may run concurrently.
+Unsupported canonicalization fails before launch. Worktrees are optional.
+
+Cancelled and failed runs can retain unconfirmed native ownership. Unknown spawn
+responses and failed stop acknowledgements block overlapping replacement until
+native discovery and strict stop reconcile them. `nativeSettlement` and cancel's
+`stopConfirmed` concern native threads only, never detached processes or write
+confinement. Guidance reports submission, not observed compliance. Public thread
+stop now propagates the existing strict settlement failures, including offline
+hosts, instead of returning successful acknowledgement for an uncertain stop.
+
+Execution identity records are retained indefinitely in this experimental slice;
+retention must not make a reused launch identity execute twice. Before stabilizing,
+audit bounded tombstones, cross-host shared filesystems, caller authorization,
+provider stop semantics, guidance deduplication, environment lifecycle changes,
+and integration of claimed results with independent content acceptance.

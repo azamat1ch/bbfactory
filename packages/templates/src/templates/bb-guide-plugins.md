@@ -953,3 +953,13 @@ validated judge results. An invalid judge retains the raw union as degraded.
 Exit 2 means partial roster or degraded judge; it does not discard good outputs.
 Attribution and snapshot freshness are caller-supplied; collection is not Factory
 task acceptance. See the Pragmatic Orchestration skill for native review plans.
+
+## Native Workflows assignments
+
+The optional Workflows plugin publishes experimental_executionStart,
+experimental_executionInspect, experimental_executionCancel and
+experimental_executionGuide. Inspect schemas with `bb plugin rpc inspect
+workflows --json` and call through `bb plugin rpc call` with an input
+file. Preserve caller task/launch identity for idempotency; unresolved spawn or
+stop blocks overlapping replacement. Existing native environments and optional
+worktrees are supported. See the Workflows skill for access and settlement limits.

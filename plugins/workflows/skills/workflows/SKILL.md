@@ -100,3 +100,16 @@ prompts and results.
 - Bounded coverage logs what it omits.
 - Structured consumers receive schema-validated results.
 - The final response uses status or inspected history, not assumptions.
+
+## Native assignment RPC
+
+For plugin-managed delegation, inspect `bb plugin rpc inspect builtin:workflows
+--json`. Use `bb plugin rpc call builtin:workflows experimental_executionStart
+--input-file <request.json> --json`, and the matching executionInspect,
+executionCancel and executionGuide methods (all have the `experimental_` prefix).
+Preserve callerTaskId and launchId when retrying transport; never invent a new
+launch to bypass unconfirmed native stop. Existing environments are valid;
+worktrees are optional. Overlapping canonical roots serialize, distinct roots
+can run concurrently. Scope text and accept-edits are not read-only enforcement.
+Read per-assignment errors, nativeSettlement and stopConfirmed. Native settlement
+does not establish detached-process termination or content acceptance.

@@ -13,6 +13,9 @@
     "paths": {
       "@get-bb/plugin-sdk": [
         "../../packages/plugin-sdk/bundled-types/bb-plugin-sdk.d.ts"
+      ],
+      "@get-bb/plugin-sdk/host": [
+        "../../packages/plugin-sdk/bundled-types/bb-plugin-sdk-host.d.ts"
       ]
     }
   },

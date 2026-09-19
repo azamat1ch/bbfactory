@@ -1,3 +1,8 @@
+import { registerExecutionRpc } from "./execution.js";
+import {
+  executionSnapshotSchema,
+  type ExecutionStart,
+} from "./execution-contract.js";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -77,6 +82,9 @@ function setup(
   const archiveFailures = new Set<string>();
   const { bb, harness } = createFakePluginHost({
     pluginId: "workflows",
+    experimental_callHostRpc: (call) => ({
+      path: (call.input as { path: string }).path,
+    }),
     sdk: {
       threads: {
         get: async ({ threadId }) => {
@@ -89,6 +97,7 @@ function setup(
             }
             return {
               id: threadId,
+              projectId: "project-test",
               environmentId: "environment-1",
               providerId: "codex",
               status: "idle",
@@ -1846,3 +1855,267 @@ describe("provider retry classification", () => {
     expect(isRetryableProviderFailure("Result schema is invalid")).toBe(false);
   });
 });
+
+describe("native assignment execution RPC", () => {
+  const hosts: Array<ReturnType<typeof setup>["harness"]> = [];
+  afterEach(async () => {
+    await Promise.all(hosts.splice(0).map((host) => host.dispose()));
+  });
+  function fixture() {
+    const test = setup();
+    hosts.push(test.harness);
+    test.harness.sdk.stub(
+      "environments.get",
+      async ({ environmentId }: { environmentId: string }) =>
+        ({
+          id: environmentId,
+          hostId: "host-1",
+          projectId: "project-test",
+          path: `/workspaces/${environmentId}`,
+        }) as never,
+    );
+    registerExecutionRpc(test.bb, test.db, test.service);
+    return test;
+  }
+  function request(): ExecutionStart {
+    return {
+      projectId: "project-test",
+      originThreadId: "origin",
+      callerTaskId: "task",
+      launchId: "launch",
+      assignments: [
+        {
+          id: "implement",
+          prompt: "Implement",
+          title: "Implementation",
+          providerId: "codex",
+          model: "gpt-test",
+          reasoningLevel: "medium",
+          serviceTier: "default",
+          environment: { type: "reuse", environmentId: "worktree-a" },
+          permissionMode: "full",
+          scope: "src/a.ts",
+        },
+      ],
+    };
+  }
+  it("deduplicates concurrent start and restart requests and rejects identity mutation", async () => {
+    const test = fixture();
+    const input = request();
+    const [first, second] = await Promise.all([
+      test.harness.callRpc("experimental_executionStart", input),
+      test.harness.callRpc("experimental_executionStart", input),
+    ]);
+    expect(first).toEqual(second);
+    expect(
+      test.db.prepare("SELECT count(*) AS count FROM workflow_runs").get(),
+    ).toEqual({ count: 1 });
+    const reloaded = createFakePluginHost();
+    hosts.push(reloaded.harness);
+    registerExecutionRpc(
+      { ...test.bb, rpc: reloaded.bb.rpc },
+      test.db,
+      createWorkflowService(test.bb, test.db),
+    );
+    expect(
+      await reloaded.harness.callRpc("experimental_executionStart", input),
+    ).toEqual(first);
+    await expect(
+      reloaded.harness.callRpc("experimental_executionStart", {
+        ...input,
+        assignments: [{ ...input.assignments[0]!, prompt: "Changed" }],
+      }),
+    ).rejects.toThrow("different request");
+  });
+  it("runs disjoint local workspaces in parallel and preserves each failure", async () => {
+    const test = fixture();
+    const input = request();
+    input.assignments.push({
+      ...input.assignments[0]!,
+      id: "review",
+      environment: { type: "reuse", environmentId: "worktree-b" },
+    });
+    const started = executionSnapshotSchema.parse(
+      await test.harness.callRpc("experimental_executionStart", input),
+    );
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(2));
+      test.service.onThreadFailed(
+        "child-1",
+        "deterministic assignment failure",
+      );
+      test.service.onThreadIdle("child-2", "review result");
+      await eventually(async () => {
+        const snapshot = executionSnapshotSchema.parse(
+          await test.harness.callRpc(
+            "experimental_executionInspect",
+            inputIdentity(input),
+          ),
+        );
+        expect(snapshot.status).toBe("failed");
+        expect(snapshot.assignments[0]).toMatchObject({
+          id: "implement",
+          status: "failed",
+          error: "deterministic assignment failure",
+        });
+        expect(snapshot.assignments[1]).toMatchObject({
+          id: "review",
+          status: "succeeded",
+          result: "review result",
+        });
+      });
+      expect(test.service.get(started.runId)?.status).toBe("failed");
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+  it("serializes shared workspaces and preserves chosen target permissions and service tier", async () => {
+    const test = fixture();
+    test.harness.sdk.stub(
+      "providers.list",
+      async ({ environmentId }: { environmentId: string }) =>
+        environmentId === "environment-1"
+          ? []
+          : ([
+              {
+                id: "codex",
+                available: true,
+                capabilities: { permissionModes: ["accept-edits"] },
+                serviceTiers: [{ id: "fast", label: "Fast" }],
+              },
+            ] as never),
+    );
+    const input = request();
+    input.assignments[0]!.permissionMode = "accept-edits";
+    input.assignments[0]!.serviceTier = "fast";
+    input.assignments.push({ ...input.assignments[0]!, id: "review" });
+    await test.harness.callRpc("experimental_executionStart", input);
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(1));
+      expect(test.harness.sdk.callsTo("threads.spawn")[0]?.[0]).toMatchObject({
+        environment: { environmentId: "worktree-a" },
+        permissionMode: "accept-edits",
+        serviceTier: "fast",
+        reasoningLevel: "medium",
+      });
+      test.service.onThreadIdle("child-1", "implemented");
+      await eventually(() => expect(test.childCount()).toBe(2));
+      test.service.onThreadIdle("child-2", "reviewed");
+      await eventually(async () =>
+        expect(
+          executionSnapshotSchema.parse(
+            await test.harness.callRpc(
+              "experimental_executionInspect",
+              inputIdentity(input),
+            ),
+          ).status,
+        ).toBe("succeeded"),
+      );
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+  it("blocks a new launch after lost spawn reply and restart until rediscovered native stop confirms", async () => {
+    const test = fixture();
+    const input = request();
+    let metadata: unknown;
+    test.harness.sdk.stub(
+      "threads.spawn",
+      async (args: Parameters<typeof test.bb.sdk.threads.spawn>[0]) => {
+        metadata = args.pluginMetadata;
+        throw new Error("network error: spawn response lost");
+      },
+    );
+    await test.harness.callRpc("experimental_executionStart", input);
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(async () =>
+        expect(
+          executionSnapshotSchema.parse(
+            await test.harness.callRpc(
+              "experimental_executionInspect",
+              inputIdentity(input),
+            ),
+          ).status,
+        ).toBe("failed"),
+      );
+      expect(test.harness.sdk.callsTo("threads.spawn")).toHaveLength(1);
+    } finally {
+      controller.abort();
+      await worker;
+    }
+    const next = { ...input, launchId: "replacement" };
+    await expect(
+      test.harness.callRpc("experimental_executionStart", next),
+    ).rejects.toThrow("unresolved");
+    test.harness.sdk.stub(
+      "threads.list",
+      async () => [{ id: "lost" }] as never,
+    );
+    test.harness.sdk.stub(
+      "threads.getPluginMetadata",
+      async () => metadata as never,
+    );
+    test.harness.sdk.stub("threads.stop", async () => {
+      throw new Error("Host unavailable");
+    });
+    const restarted = createWorkflowService(test.bb, test.db);
+    const reloaded = createFakePluginHost();
+    hosts.push(reloaded.harness);
+    registerExecutionRpc(
+      { ...test.bb, rpc: reloaded.bb.rpc },
+      test.db,
+      restarted,
+    );
+    const recovery = new AbortController();
+    const recoveryWorker = restarted.runWorker(recovery.signal);
+    try {
+      await eventually(() =>
+        expect(
+          test.db
+            .prepare("SELECT thread_id FROM workflow_spawn_attempts")
+            .get(),
+        ).toEqual({ thread_id: "lost" }),
+      );
+      expect(
+        await reloaded.harness.callRpc(
+          "experimental_executionCancel",
+          inputIdentity(input),
+        ),
+      ).toMatchObject({ stopConfirmed: false });
+      await expect(
+        reloaded.harness.callRpc("experimental_executionStart", next),
+      ).rejects.toThrow("unresolved");
+      test.harness.sdk.stub("threads.stop", async () => ({ ok: true }));
+      expect(
+        await reloaded.harness.callRpc(
+          "experimental_executionCancel",
+          inputIdentity(input),
+        ),
+      ).toMatchObject({ stopConfirmed: true });
+      expect(
+        executionSnapshotSchema.parse(
+          await reloaded.harness.callRpc("experimental_executionStart", next),
+        ).status,
+      ).toBe("queued");
+    } finally {
+      recovery.abort();
+      await recoveryWorker;
+    }
+  });
+});
+
+function inputIdentity(input: ExecutionStart) {
+  return {
+    originThreadId: input.originThreadId,
+    callerTaskId: input.callerTaskId,
+    launchId: input.launchId,
+  };
+}

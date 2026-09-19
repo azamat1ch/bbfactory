@@ -281,3 +281,40 @@ requires a separate evidence-based audit of historical records; this migration
 does not guess ownership from titles or modify those threads. Discovery and
 cleanup require a running plugin and available thread APIs; unavailable hosts
 leave durable cleanup pending.
+
+## Native assignment integration (experimental)
+
+Use the discoverable RPC contract in `src/execution-contract.ts` through
+`bb.sdk.plugins.callRpc`, or inspect and call it from the CLI:
+
+```sh
+bb plugin rpc inspect builtin:workflows --json
+bb plugin rpc call builtin:workflows experimental_executionStart --input-file assignments.json --json
+bb plugin rpc call builtin:workflows experimental_executionInspect --input-file identity.json --json
+bb plugin rpc call builtin:workflows experimental_executionCancel --input-file identity.json --json
+bb plugin rpc call builtin:workflows experimental_executionGuide --input-file guidance.json --json
+```
+
+Identity is `{originThreadId, callerTaskId, launchId}`. Start additionally requires
+`projectId` and `assignments`; all assignment selection fields are explicit,
+including `serviceTier`, `environment: {type: "reuse", environmentId}`,
+`permissionMode` and advisory `scope`. Use native environment creation beforehand
+when a separate worktree is wanted. Shared environments work without a worktree.
+Permissions are provider permissions, not filesystem confinement or read-only
+access. Canonical equal/ancestor workspace roots on the same host serialize;
+distinct local worktrees run concurrently. Missing roots or host canonicalization
+fail before execution. Each assignment preserves its own native call/thread,
+result and failure. Guidance targets one running assignment and records only
+submission, never compliance.
+
+Start is idempotent across concurrent calls and plugin restarts; changing the
+request under the same identity fails. Native spawn intent is durable before
+creation. A lost spawn response is unresolved until ownership metadata discovery
+finds the worker; no blind retry is made. Failed stop acknowledgement prevents
+replacement in an overlapping managed workspace. Interrupted managed executions
+fail conservatively; inspect, reconcile/cancel, and use a new launch identity for
+an explicit retry. Generic workflows preserve restart replay only after all known
+attempts have confirmed stop. `nativeSettlement` and `stopConfirmed` report native
+thread settlement only; they do not prove detached processes have stopped.
+Execution identity history is retained indefinitely until bounded tombstones are
+implemented, so retention cannot silently reuse an old launch identity.

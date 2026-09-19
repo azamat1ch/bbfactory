@@ -706,6 +706,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
         bullets: [
           "Call its server from its UI over RPC, with arguments and results checked against a schema",
           "Publish RPC methods with experimental_discoverable and registration/method experimental_description; other plugins discover implementations and copy their published JSON Schemas using bb plugin rpc inspect",
+          "Delegate through builtin:workflows experimental_executionStart, experimental_executionInspect, experimental_executionCancel and experimental_executionGuide using PluginsArea.callRpc; stable caller task/launch identities own native runs, canonical overlapping roots serialize, and native settlement never guarantees detached processes stopped",
           "Serve exact-path HTTP and WebSocket routes other systems can call, webhooks included",
           "Push messages to every open bb window, so the UI does not have to poll",
         ],
@@ -713,6 +714,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "PluginRpc",
           "PluginRpcMethodContract",
           "PluginsArea.experimental_discoverRpc",
+          "PluginsArea.callRpc",
           "PluginHttp",
           "PluginRealtime",
           "ExperimentalPluginWebSocket",

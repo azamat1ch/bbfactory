@@ -1,3 +1,7 @@
+import {
+  executionStartSchema,
+  type ExecutionAssignment,
+} from "./execution-contract.js";
 import { createHash } from "node:crypto";
 import Ajv from "ajv";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -342,6 +346,8 @@ interface StartWorkflowInput {
   source: string;
   args: JsonValue;
   resumedFromRunId: string | null;
+  executionRunId?: string;
+  executionHosts?: Record<string, { hostId: string; rootPath: string }>;
 }
 
 export interface WorkflowService {
@@ -502,6 +508,9 @@ export function createWorkflowService(
         );
         if (!metadata.success) continue;
         const owner = metadata.data;
+        db.prepare(
+          "UPDATE workflow_spawn_attempts SET thread_id = ?, state = 'attached' WHERE call_id = ? AND state = 'requested'",
+        ).run(thread.id, owner.callId);
         ownWorker(
           db,
           thread.id,
@@ -532,11 +541,29 @@ export function createWorkflowService(
     }
   }
 
+  async function confirmedStop(threadId: string): Promise<void> {
+    await bb.sdk.threads.stop({ threadId });
+    db.prepare(
+      "UPDATE workflow_spawn_attempts SET state = 'stopped' WHERE thread_id = ?",
+    ).run(threadId);
+  }
+
+  function assignmentFor(
+    run: WorkflowRunRow,
+    title: string | null,
+  ): ExecutionAssignment | null {
+    if (!run.id.startsWith("wfr_exec_")) return null;
+    return (
+      executionStartSchema
+        .parse(JSON.parse(run.argsJson))
+        .assignments.find((assignment) => assignment.id === title) ?? null
+    );
+  }
+
   async function stopChild(threadId: string): Promise<void> {
     const pending = childStops.get(threadId);
     if (pending !== undefined) return pending;
-    const stopping = bb.sdk.threads
-      .stop({ threadId })
+    const stopping = confirmedStop(threadId)
       .then(() => undefined)
       .catch((error) => {
         if (!isMissingThread(error)) {
@@ -594,6 +621,14 @@ export function createWorkflowService(
         throw new Error(`Workflow args are invalid: ${validation.error}`);
     }
     const origin = await resolveOrigin(input);
+    if (input.executionRunId !== undefined) {
+      const existing = getRun(db, input.executionRunId);
+      if (existing !== null) {
+        if (existing.argsJson !== JSON.stringify(input.args))
+          throw new Error("Launch identity already has a different request");
+        return existing;
+      }
+    }
     if (input.resumedFromRunId !== null) {
       const previous = getRun(db, input.resumedFromRunId);
       if (previous === null || previous.projectId !== input.projectId) {
@@ -606,27 +641,76 @@ export function createWorkflowService(
           `Cannot resume workflow run ${input.resumedFromRunId} before it is terminal`,
         );
       }
+      if (previous.id.startsWith("wfr_exec_"))
+        throw new Error(
+          "Managed executions retry through a new launch identity after confirmed cancellation",
+        );
+      const priorAttempts = db
+        .prepare(
+          "SELECT thread_id AS threadId FROM workflow_spawn_attempts WHERE run_id = ? AND state != 'stopped' AND thread_id IS NOT NULL",
+        )
+        .all(previous.id) as Array<{ threadId: string }>;
+      await stopChildren(priorAttempts.map((attempt) => attempt.threadId));
+      if (
+        db
+          .prepare(
+            "SELECT 1 FROM workflow_spawn_attempts WHERE run_id = ? AND state != 'stopped'",
+          )
+          .get(previous.id)
+      ) {
+        throw new Error("Previous workflow has unresolved worker stop state");
+      }
       if (previous.environmentId !== origin.environmentId) {
         throw new Error(
           `Cannot resume workflow run ${input.resumedFromRunId} from a different environment or workspace`,
         );
       }
     }
-    const created = createRun(db, {
-      projectId: input.projectId,
-      originThreadId: input.originThreadId,
-      environmentId: origin.environmentId,
-      originProvider: origin.providerId,
-      originModel: origin.model,
-      originReasoningLevel: origin.reasoningLevel,
-      originPermissionMode: origin.permissionMode,
-      name: parsed.metadata.name,
-      source: input.source,
-      sourceHash: createHash("sha256").update(input.source).digest("hex"),
-      argsJson: JSON.stringify(input.args),
-      settingsJson: JSON.stringify(currentSettings),
-      resumedFromRunId: input.resumedFromRunId,
-    });
+    const created = db.transaction(() => {
+      for (const { hostId, rootPath } of Object.values(
+        input.executionHosts ?? {},
+      )) {
+        const conflict = db
+          .prepare(`SELECT 1 FROM workflow_execution_environments environments JOIN workflow_runs runs ON runs.id = environments.run_id
+          WHERE environments.host_id = ? AND (runs.status IN ('queued', 'running') OR EXISTS (
+            SELECT 1 FROM workflow_spawn_attempts attempts WHERE attempts.run_id = runs.id AND attempts.state != 'stopped'
+          )) AND (rtrim(environments.root_path, '/') = rtrim(?, '/')
+            OR substr(rtrim(environments.root_path, '/'), 1, length(rtrim(?, '/')) + 1) = rtrim(?, '/') || '/'
+            OR substr(rtrim(?, '/'), 1, length(rtrim(environments.root_path, '/')) + 1) = rtrim(environments.root_path, '/') || '/') LIMIT 1`)
+          .get(hostId, rootPath, rootPath, rootPath, rootPath);
+        if (conflict)
+          throw new Error(
+            "Assignment workspace has active or unresolved execution ownership",
+          );
+      }
+      const created = createRun(
+        db,
+        {
+          projectId: input.projectId,
+          originThreadId: input.originThreadId,
+          environmentId: origin.environmentId,
+          originProvider: origin.providerId,
+          originModel: origin.model,
+          originReasoningLevel: origin.reasoningLevel,
+          originPermissionMode: origin.permissionMode,
+          name: parsed.metadata.name,
+          source: input.source,
+          sourceHash: createHash("sha256").update(input.source).digest("hex"),
+          argsJson: JSON.stringify(input.args),
+          settingsJson: JSON.stringify(currentSettings),
+          resumedFromRunId: input.resumedFromRunId,
+        },
+        input.executionRunId,
+      );
+      for (const [environmentId, { hostId, rootPath }] of Object.entries(
+        input.executionHosts ?? {},
+      )) {
+        db.prepare(
+          "INSERT INTO workflow_execution_environments (run_id, environment_id, host_id, root_path) VALUES (?, ?, ?, ?)",
+        ).run(created.id, environmentId, hostId, rootPath);
+      }
+      return created;
+    })();
     publishRunsChanged(created.originThreadId);
     return created;
   }
@@ -923,7 +1007,20 @@ export function createWorkflowService(
           throw new Error("Workflow origin is archived or deleted");
         }
         throwIfCancelled(signal);
+        const unresolved = db
+          .prepare(
+            "SELECT 1 FROM workflow_spawn_attempts WHERE call_id = ? AND state != 'stopped'",
+          )
+          .get(call.id);
+        if (unresolved)
+          throw new Error(
+            "Worker creation or stop is unresolved; replacement blocked",
+          );
+        db.prepare(
+          "INSERT INTO workflow_spawn_attempts (call_id, run_id, state) VALUES (?, ?, 'requested') ON CONFLICT(call_id) DO UPDATE SET thread_id = NULL, state = 'requested'",
+        ).run(call.id, run.id);
         spawningCalls.add(call.id);
+        const assignment = assignmentFor(run, options.title);
         const child = await bb.sdk.threads.spawn({
           lifecycleOwnerThreadId: run.originThreadId,
           pluginMetadata: {
@@ -933,15 +1030,27 @@ export function createWorkflowService(
             originThreadId: run.originThreadId,
           },
           projectId: run.projectId,
-          environment: { type: "reuse", environmentId: run.environmentId },
+          environment: assignment?.environment ?? {
+            type: "reuse",
+            environmentId: run.environmentId,
+          },
           prompt: childPrompt(run, prompt, options),
-          title: options.title ?? `${run.name} · ${callIndex + 1}`,
+          title:
+            assignment?.title ??
+            options.title ??
+            `${run.name} · ${callIndex + 1}`,
           providerId: selection.providerId,
           model: selection.model,
           reasoningLevel: selection.reasoningLevel,
           permissionMode: selection.permissionMode,
+          ...(assignment === null
+            ? {}
+            : { serviceTier: assignment.serviceTier }),
           visibility: "hidden",
         });
+        db.prepare(
+          "UPDATE workflow_spawn_attempts SET thread_id = ?, state = 'attached' WHERE call_id = ?",
+        ).run(child.id, call.id);
         ownWorker(db, child.id, run.id, call.id, run.originThreadId);
         if (signal.aborted) {
           await stopChild(child.id);
@@ -978,7 +1087,9 @@ export function createWorkflowService(
           );
         }
         try {
-          return await waitForCall(call, signal);
+          const result = await waitForCall(call, signal);
+          if (run.id.startsWith("wfr_exec_")) await confirmedStop(child.id);
+          return result;
         } finally {
           signal.removeEventListener("abort", stopOnAbort);
         }
@@ -989,6 +1100,16 @@ export function createWorkflowService(
         if (delay === undefined || !isRetryableProviderFailure(error)) {
           throw error;
         }
+        const attempt = db
+          .prepare(
+            "SELECT thread_id AS threadId FROM workflow_spawn_attempts WHERE call_id = ?",
+          )
+          .get(call.id) as { threadId: string | null } | undefined;
+        if (attempt?.threadId == null)
+          throw new Error(
+            `Worker spawn outcome unknown; replacement blocked: ${message(error)}`,
+          );
+        await confirmedStop(attempt.threadId);
         const detail = message(error);
         const queued = queueCallProviderRetry(db, call.id, detail);
         if (queued === null) throw error;
@@ -1354,7 +1475,20 @@ export function createWorkflowService(
         const index = callIndex;
         callIndex += 1;
         const computeIdentity = async (previousKey: string | null) => {
-          const selection = await validateSelection(run, options, callSignal);
+          const assignment = assignmentFor(run, options.title);
+          const selectedRun =
+            assignment === null
+              ? run
+              : {
+                  ...run,
+                  environmentId: assignment.environment.environmentId,
+                  originPermissionMode: assignment.permissionMode,
+                };
+          const selection = await validateSelection(
+            selectedRun,
+            options,
+            callSignal,
+          );
           const cacheKey = computeWorkflowCallCacheKey({
             version: WORKFLOW_CALL_CACHE_VERSION,
             previousCacheKey: previousKey,
@@ -1563,7 +1697,7 @@ export function createWorkflowService(
 
   async function archiveRetiredWorker(threadId: string): Promise<boolean> {
     try {
-      await bb.sdk.threads.stop({ threadId });
+      await confirmedStop(threadId);
       await bb.sdk.threads.archive({ threadId });
       return true;
     } catch (error) {
@@ -1612,6 +1746,12 @@ export function createWorkflowService(
       },
       { once: true },
     );
+    const recoveringThreads = db
+      .prepare(
+        "SELECT attempts.thread_id AS threadId FROM workflow_spawn_attempts attempts JOIN workflow_runs runs ON runs.id = attempts.run_id WHERE runs.status = 'running' AND attempts.thread_id IS NOT NULL AND attempts.state != 'stopped'",
+      )
+      .all() as Array<{ threadId: string }>;
+    await stopChildren(recoveringThreads.map((entry) => entry.threadId));
     await stopChildren(recoverInterruptedRuns(db));
     const active = new Set<Promise<void>>();
     let nextMaintenanceAt = 0;
@@ -1649,6 +1789,13 @@ export function createWorkflowService(
     for (const controller of controllers.values()) controller.abort();
     await Promise.allSettled(active);
     await Promise.allSettled(handlerTasks);
+    await Promise.allSettled(childStops.values());
+    const shutdownThreads = db
+      .prepare(
+        "SELECT attempts.thread_id AS threadId FROM workflow_spawn_attempts attempts JOIN workflow_runs runs ON runs.id = attempts.run_id WHERE runs.status = 'running' AND attempts.thread_id IS NOT NULL AND attempts.state != 'stopped'",
+      )
+      .all() as Array<{ threadId: string }>;
+    await stopChildren(shutdownThreads.map((entry) => entry.threadId));
     await stopChildren(recoverInterruptedRuns(db));
     await Promise.allSettled(childStops.values());
   }

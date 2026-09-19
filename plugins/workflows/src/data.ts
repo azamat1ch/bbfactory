@@ -231,6 +231,13 @@ export const migrations = [
      FROM workflow_calls calls JOIN workflow_runs runs ON runs.id = calls.run_id
      WHERE calls.child_thread_id IS NOT NULL;`,
   `ALTER TABLE workflow_workers ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE workflow_execution_environments (run_id TEXT NOT NULL, environment_id TEXT NOT NULL, host_id TEXT NOT NULL, root_path TEXT NOT NULL, PRIMARY KEY (run_id, environment_id));
+    CREATE INDEX workflow_execution_environments_host ON workflow_execution_environments(host_id);`,
+  `CREATE TABLE workflow_spawn_attempts (
+    call_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, thread_id TEXT,
+    state TEXT NOT NULL CHECK (state IN ('requested', 'attached', 'stopped'))
+  );
+  CREATE INDEX workflow_spawn_attempts_run ON workflow_spawn_attempts(run_id, state);`,
 ];
 
 export function createRun(
@@ -253,8 +260,9 @@ export function createRun(
     | "startedAt"
     | "finishedAt"
   >,
+  explicitId?: string,
 ): WorkflowRunRow {
-  const id = `wfr_${randomUUID()}`;
+  const id = explicitId ?? `wfr_${randomUUID()}`;
   const now = Date.now();
   db.prepare(
     `INSERT INTO workflow_runs (
@@ -469,7 +477,10 @@ export function recoverInterruptedRuns(db: Db): string[] {
        )`,
     ).run(now);
     db.prepare(
-      `UPDATE workflow_runs SET status = 'queued', error = NULL, finished_at = NULL
+      `UPDATE workflow_runs SET
+         status = CASE WHEN id LIKE 'wfr_exec_%' OR EXISTS (SELECT 1 FROM workflow_spawn_attempts WHERE run_id = workflow_runs.id AND state != 'stopped') THEN 'failed' ELSE 'queued' END,
+         error = CASE WHEN id LIKE 'wfr_exec_%' OR EXISTS (SELECT 1 FROM workflow_spawn_attempts WHERE run_id = workflow_runs.id AND state != 'stopped') THEN 'Plugin restarted with unresolved execution; reconcile before replacement' ELSE NULL END,
+         finished_at = NULL
        WHERE status = 'running'`,
     ).run();
     return childRows.map((row) => row.childThreadId);
@@ -826,6 +837,8 @@ const EXPIRED_TERMINAL_RUN_IDS_SQL = `WITH RECURSIVE retained(id, resumed_from_r
          SELECT id, resumed_from_run_id FROM workflow_runs
          WHERE status IN ('succeeded', 'failed', 'cancelled')
            AND notification_sent = 1
+           AND id NOT LIKE 'wfr_exec_%'
+           AND NOT EXISTS (SELECT 1 FROM workflow_spawn_attempts WHERE run_id = workflow_runs.id AND state != 'stopped')
            AND finished_at + json_extract(settings_json, '$.retentionDays') * 86400000 <= ?
            AND id NOT IN (SELECT id FROM retained)
        ), leaf_depth(id, resumed_from_run_id, depth) AS (
@@ -873,6 +886,9 @@ export function deleteTerminalRuns(db: Db, runIds: readonly string[]): number {
       .run(...runIds).changes;
     db.prepare(
       `DELETE FROM workflow_workers WHERE archived_at IS NOT NULL AND run_id IN (${placeholders})`,
+    ).run(...runIds);
+    db.prepare(
+      `DELETE FROM workflow_spawn_attempts WHERE state = 'stopped' AND run_id IN (${placeholders})`,
     ).run(...runIds);
     return deleted;
   })();
