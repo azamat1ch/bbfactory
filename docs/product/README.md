@@ -6,20 +6,21 @@ justified core changes. Users should experience one coherent workspace.
 
 ## What exists
 
-| Area | Verified now | Still to build |
-| --- | --- | --- |
-| Repository | Private `azamat1ch/bbfactory`; `kametayturar` has write access; canonical product docs in this repo | Product CI and release packaging |
-| Foundation | Frozen install, 50 build tasks, 98 typecheck tasks and browser/server smoke; [baseline](baseline.md) | Electron smoke; future runtime changes need their own checks |
-| Orchestration | BB has native threads and durable Workflows; external Porch/Devin runs helped bootstrap this repo | Integrated task/spec contracts, supervision policy, cross-review and verified delivery |
-| Providers | Inherited Codex/Claude and ACP providers, including Cursor/OpenCode | Real account checks; Devin integration; validate a GLM/Z.ai execution route |
-| Capacity | Inherited usage UI and experimental Codex/Claude account pooling | Coherent subscription view, pool-aware allocation and recovery across supported providers |
-| Chat | Inherited BB UI; [compact workspace prototype](prototypes/README.md), using illustrative data | Connect lead/team/execution controls and requirement evidence to native records |
-| Efficiency | No measured improvement yet | Compare complete accepted runs including coordination, retries and review |
+| Area          | Verified now                                                                                                                                                               | Still to build                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Repository    | Private `azamat1ch/bbfactory`; `kametayturar` has write access; canonical product docs in this repo                                                                        | Product CI and release packaging                                                          |
+| Foundation    | Frozen install, 50 build tasks, 98 typecheck tasks and browser/server smoke; [baseline](baseline.md)                                                                       | Electron smoke; future runtime changes need their own checks                              |
+| Orchestration | BB has native threads and durable Workflows; external Porch/Devin runs helped bootstrap this repo                                                                          | Integrated task/spec contracts, supervision policy, cross-review and verified delivery    |
+| Providers     | Inherited Codex/Claude and ACP providers, including Cursor/OpenCode; merged Devin declaration                                                                              | Real account checks; validate a GLM/Z.ai execution route                                  |
+| Capacity      | Inherited usage UI and experimental Codex/Claude account pooling                                                                                                           | Coherent subscription view, pool-aware allocation and recovery across supported providers |
+| Chat          | Native Team Auto/Off/Selected preference plugin with the real model picker, CLI/tool access and persisted defaults; [implementation](../../plugins/factory-team/README.md) | Native task/check evidence, orchestration acceptance and later plan/lineage views         |
+| Efficiency    | No measured improvement yet                                                                                                                                                | Compare complete accepted runs including coordination, retries and review                 |
 
 Provider presence is source evidence, not a successful run with the user's
 account. Usage reporting and account rotation must be verified independently.
-Native Devin support, the first task/check runtime and the native guidance bundle
-are in separate implementation worktrees. None is accepted into this branch yet.
+Devin support is merged; successful account execution remains a separate check.
+The first task/check runtime and native guidance bundle remain in separate
+implementation worktrees. Team preferences do not establish that delivery slice.
 
 ## Read only what you need
 

@@ -1,6 +1,6 @@
 # bbfactory specification
 
-Status: canonical product direction; implementation is pending. This consolidates
+Status: canonical product direction; see the status map for implemented slices. This consolidates
 the original LifeOS Subscription Team plan and subsequent user corrections.
 
 ## Outcome
@@ -24,31 +24,37 @@ behavior and an honest account of what remains unresolved.
 - Workers: interchangeable eligible profiles. Codex, Claude Code, Cursor,
   Devin, OpenCode and GLM/Z.ai are targets. Sol and Devin are peers and may
   cross-review; no built-in quality hierarchy between them.
-- Execution: Auto, Direct and Delegate. Auto must consider coordination cost;
-  direct work follows the same acceptance contract.
+- Team control: Auto, Off and Selected in normal chat. Auto considers coordination
+  cost; Off prefers direct work; Selected limits eligible implementer models,
+  not worker count. Explicit task instructions override the saved preference.
+  Use BB's native provider/model/reasoning/tier catalog, including installed
+  Devin. Each provider/model appears once; effort and tier configure that entry.
+  Keep the lead selector unchanged. Direct work follows the same acceptance
+  contract; a separate Execution selector is not required.
 - Pragmatic Orchestration: adapt its useful practices extensively. Use BB's
   execution facilities first; no commitment to vendoring Porch or translating
   all of its implementation. Development tools do not define product runtime.
 - UI: normal chat exposes lead, team, available capacity and task/check state.
-  Prototype compact cards and an expanded dashboard against the same records;
-  the preferred default remains undecided.
+  Default to the existing BB conversation and native worker activity, with
+  compact nested selectors and shared menu motion. Avoid a bespoke drawer or
+  dashboard as the default. Expanded plans/lineage remain a later exploration.
 - Project context: discover existing instructions, docs and tests. Use progressive
   disclosure. Do not require users to reorganize their repository into our layout.
 
 ## Required behavior
 
-| ID | Outcome | Acceptance condition |
-| --- | --- | --- |
-| SPEC | Agreed definition of success | Tasks reference a versioned specification, requirement IDs, scope and checks; material changes are explicit |
-| EXEC | Direct or delegated execution | Either route can produce an accepted result; switching a worker does not switch the user's lead |
-| TEAM | Bounded collaboration | Workers get relevant context, ownership, interfaces and checks; independent workers cannot overwrite each other |
-| REVIEW | Review proportional to risk | Peer findings retain their evidence; unresolved required findings block acceptance; no automatic endless review rounds |
-| VERIFY | Result matches the accepted behavior | Required checks run on the final integrated content; worker completion alone never means acceptance |
-| RECOVER | Progress survives interruption | Preserve changes and a concise handover; confirm the previous writer stopped before replacement; uncertain state prevents duplicate launch |
-| CAPACITY | Honest subscription state | Track source, units, observation/reset times and shared pools; unknown or stale values stay visible |
-| ROUTE | Accountable resource choices | Filter by access, permissions, tools, context and capacity; explain consequential assignments; respect configured bounds |
-| UI | Understandable work | Chat, dashboard and CLI show the same persisted tasks, attempts, decisions and evidence; transcripts are available on demand |
-| EXTEND | Customizable workflow | Reuse BB plugins and project conventions; persistent workflow changes are reviewable and reversible |
+| ID       | Outcome                              | Acceptance condition                                                                                                                       |
+| -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| SPEC     | Agreed definition of success         | Tasks reference a versioned specification, requirement IDs, scope and checks; material changes are explicit                                |
+| EXEC     | Direct or delegated execution        | Either route can produce an accepted result; switching a worker does not switch the user's lead                                            |
+| TEAM     | Bounded collaboration                | Workers get relevant context, ownership, interfaces and checks; independent workers cannot overwrite each other                            |
+| REVIEW   | Review proportional to risk          | Peer findings retain their evidence; unresolved required findings block acceptance; no automatic endless review rounds                     |
+| VERIFY   | Result matches the accepted behavior | Required checks run on the final integrated content; worker completion alone never means acceptance                                        |
+| RECOVER  | Progress survives interruption       | Preserve changes and a concise handover; confirm the previous writer stopped before replacement; uncertain state prevents duplicate launch |
+| CAPACITY | Honest subscription state            | Track source, units, observation/reset times and shared pools; unknown or stale values stay visible                                        |
+| ROUTE    | Accountable resource choices         | Filter by access, permissions, tools, context and capacity; explain consequential assignments; respect configured bounds                   |
+| UI       | Understandable work                  | Chat, dashboard and CLI show the same persisted tasks, attempts, decisions and evidence; transcripts are available on demand               |
+| EXTEND   | Customizable workflow                | Reuse BB plugins and project conventions; persistent workflow changes are reviewable and reversible                                        |
 
 A profile identifies harness, model, reasoning, tools, account/quota pool,
 execution environment and permissions. A model name alone cannot establish

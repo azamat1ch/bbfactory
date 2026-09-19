@@ -365,9 +365,10 @@ export function ModelReasoningPicker({
   const selectedReasoningOption = reasoningOptions.find(
     (r) => r.value === reasoningValue,
   );
-  const triggerReasoningLabel = hasSelectedModel
-    ? (selectedReasoningOption?.label ?? null)
-    : null;
+  const triggerReasoningLabel =
+    hasSelectedModel && reasoningOptions.length > 1
+      ? (selectedReasoningOption?.label ?? null)
+      : null;
 
   const isPreviewing =
     previewProviderId !== null && previewProviderId !== selectedProviderId;
@@ -553,7 +554,7 @@ export function ModelReasoningPicker({
     hasSelectedModel && fastModeEnabled && modelOptions.length > 0;
   const showReasoningSection =
     !isShowingModelError &&
-    activeReasoningOptions.length > 0 &&
+    activeReasoningOptions.length > 1 &&
     (isPreviewing
       ? hasActiveModelOptions && !activeModelIsLoading
       : hasSelectedModel && !modelIsLoading && !selectedModelLoadFailed);

@@ -288,6 +288,7 @@ describe("builtin plugin reconciliation", () => {
   it("gives every builtin plugin a deliberate settings icon", async () => {
     const expectedIcons = new Map([
       ["bb-guide", "Explore"],
+      ["factory-team", "Workflow"],
       ["account-pool", "Layers"],
       ["ask-user-question", "MessageQuestion"],
       ["automations", "Repeat"],

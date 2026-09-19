@@ -1,6 +1,6 @@
 # Core chat experience and demo
 
-Status: proposed UX and demo target. BB bootstrap runs; no bbfactory orchestration UI or runtime has been implemented yet. User wants orchestration reflected in the core conversation, with both compact and expanded views available to evaluate.
+Status: Team preference control implemented in the bundled `factory-team` plugin; the task/evidence timeline and full demo below remain targets. Team is guidance to the lead, not scheduler admission enforcement.
 
 ## Product and implementation boundary
 
@@ -13,17 +13,18 @@ Inherited: BB workspace, provider/model selection, extension surfaces, workflow 
 The chosen lead remains the conversational model. Changing a worker assignment does not change that lead.
 
 - Lead: provider/model/reasoning controls for the main conversation; initial preference Astra, user-selectable.
-- Team: enabled worker profiles and availability, with interchangeable harness/model/account profiles; Sol and Devin are examples of peers. Show unknown capacity as unknown; do not invent comparable remaining-token numbers.
-- Execution: Auto, direct, or delegate. Auto can keep coherent work in the current thread. This is separate from selecting a model.
+- Team: Auto, Off or Selected in a nested dropdown beside the existing lead picker. Selected uses the same native provider/model picker, including installed Devin. Each provider/model can appear once, with its reasoning/tier configuration; profiles are eligibility, not fixed worker counts. Agent-managed or fixed reasoning does not need a separate control.
+- Scope: thread preferences persist; the new-thread composer edits a labelled project default, snapshotted into new conversations. Current user instructions override the preference for a task. Auto can keep coherent work in the lead; Selected also permits direct work. There is no separate Execution selector.
+- Workers: reuse native worker progress and transcripts. Capacity remains a separate surface; account rotation is not implemented by the Team selector.
 - Context: a compact accepted task/spec summary linked to existing project documents, with no mandatory replacement directory structure.
 - Timeline: ordinary discussion plus factual task cards showing assignment, brief, handover, cross-review findings and evidence. Expand to inspect native worker output.
 - Result: distinguish worker completion, review state, required check results and acceptance. Evidence identifies the tested content; a failed or missing check is not success.
-- Expanded view: team dashboard and app preview read the same state as compact cards. They are alternate views, not separate execution systems.
+- Later exploration: plan/lineage visualization for long goals, reading the same native records. Keep the existing BB conversation as the default, with shared responsive menus and no bespoke drawer.
 
 Proposed compact controls:
 
 ```text
-Lead: Astra     Team: Sol + Devin     Execution: Auto
+[existing provider/model picker]     Team: 2 profiles
 Task: Add event capacity and waitlist     Checks: 0/3
 
 You: Add a waitlist when the event is full.

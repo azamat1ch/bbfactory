@@ -33,6 +33,11 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
+    name: "factory-team",
+    pluginId: "factory-team",
+    defaultEnabled: true,
+  },
+  {
     name: "bb-guide",
     pluginId: "bb-guide",
     defaultEnabled: true,

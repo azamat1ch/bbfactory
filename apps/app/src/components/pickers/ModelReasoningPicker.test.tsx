@@ -255,6 +255,19 @@ afterEach(() => {
 });
 
 describe("ModelReasoningPicker", () => {
+  it("hides a fixed agent-managed reasoning value from the trigger and menu", () => {
+    renderPicker({
+      pickerReasoningOptions: [{ value: "medium", label: "Medium" }],
+    });
+    const trigger = screen.getByRole("button", {
+      name: "Provider, model and reasoning",
+    });
+    expect(trigger.textContent).not.toContain("Medium");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("radiogroup", { name: "Reasoning" })).toBeNull();
+    expect(screen.queryByText("Reasoning")).toBeNull();
+  });
+
   it.each([
     ["ArrowRight", "medium", "high"],
     ["ArrowLeft", "high", "medium"],
