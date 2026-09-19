@@ -401,8 +401,8 @@ describe("Factory task evidence", () => {
     const slot = renderSlot(
       directive,
       {
-        attributes: { task: "task-1" },
-        source: '::factory-task{task="task-1"}',
+        attributes: { taskId: "task-1" },
+        source: '::factory-task{taskId="task-1"}',
         message: {
           id: "message-1",
           threadId: "lead-1",

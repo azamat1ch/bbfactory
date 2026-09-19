@@ -143,8 +143,8 @@ function GoalCard({
 
 function FactoryTaskDirective({ attributes }: PluginMessageDirectiveProps) {
   const taskId =
-    typeof attributes.task === "string" && attributes.task.trim()
-      ? attributes.task
+    typeof attributes.taskId === "string" && attributes.taskId.trim()
+      ? attributes.taskId
       : null;
   const { state, refresh, connected } = useTask(taskId);
   const navigate = useBbNavigate();
