@@ -1,4 +1,27 @@
-# Codebase Guidelines
+# bbfactory agent entry point
+
+Read [README.md](README.md) for setup and [product status](docs/product/README.md)
+for what exists. Load [spec.md](docs/product/spec.md) for product decisions and
+[first-slice.md](docs/product/first-slice.md) for current implementation work;
+follow architecture, source inventory and package docs only as needed.
+
+- Reuse BB-native providers, threads, Workflows and plugin surfaces before adding
+  another runtime. Porch is an optional development tool, not a required product
+  dependency. Devin is one provider; no provider or model is the scheduler.
+- Direct execution is valid. Delegate only bounded independent work with a goal,
+  scope, relevant context, frozen interfaces, checks and a handover/result format.
+  Sol and Devin are peers; choose by suitability and availability.
+- Establish shared contracts before parallel work; isolate concurrent writers.
+  One integration owner verifies the combined result. Seek independent Astra
+  review for architecture and milestone acceptance, backed by source/test evidence.
+- Keep one canonical product contract. Update it when behavior changes. Do not
+  copy the whole spec or transcripts into every worker brief. End-user projects
+  retain their own documentation layout.
+- Worker completion is not acceptance. Run appropriate checks against the actual
+  resulting content. Report implemented, tested and still-proposed work separately.
+
+The inherited engineering rules below apply unless a deliberate, documented
+product change supersedes them.
 
 ## Task Completion
 
