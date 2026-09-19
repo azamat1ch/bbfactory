@@ -10,6 +10,7 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
   let enabled = true;
   let failure = false;
   let hasWork = true;
+  let enabledProviderIds = new Set(["codex", "claude-code"]);
   const rpc = vi.fn(async ({ pluginId, method, input }) => {
     if (method === usageListMethod)
       return pluginId === "pool"
@@ -84,14 +85,15 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
         ],
       },
       providers: {
-        list: async () => [
-          { id: "codex", displayName: "Codex", logoUrl: "/codex.svg" },
-          {
-            id: "claude-code",
-            displayName: "Claude Code",
-            logoUrl: "/claude.svg",
-          },
-        ],
+        list: async () =>
+          [
+            { id: "codex", displayName: "Codex", logoUrl: "/codex.svg" },
+            {
+              id: "claude-code",
+              displayName: "Claude Code",
+              logoUrl: "/claude.svg",
+            },
+          ].filter((provider) => enabledProviderIds.has(provider.id)),
       },
       plugins: {
         experimental_discoverRpc: async () =>
@@ -215,6 +217,51 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
         .filter(([args]) => args.method === usageFetchMethod)
         .at(-1)?.[0].pluginId,
     ).toBe("local");
+    const claudeFetches = rpc.mock.calls.filter(
+      ([args]) =>
+        args.method === usageFetchMethod && args.input.resourceId === "claude",
+    ).length;
+    enabledProviderIds = new Set(["codex"]);
+    const disabledLazy = await host.harness.behavior.callRpc("getUsage", {
+      ...request,
+      providerId: "claude-code",
+      machineIds: ["source:pool"],
+      force: true,
+    });
+    expect(disabledLazy).toMatchObject({
+      machines: expect.arrayContaining([
+        expect.objectContaining({
+          id: "source:pool",
+          providers: expect.not.arrayContaining([
+            expect.objectContaining({ providerId: "claude-code" }),
+          ]),
+        }),
+      ]),
+    });
+    const disabledSnapshot = await host.harness.behavior.callRpc("readLimits", {
+      force: false,
+      machineIds: null,
+      maxAgeMs: 60_000,
+    });
+    expect(disabledSnapshot).toMatchObject({
+      snapshot: {
+        machines: expect.arrayContaining([
+          expect.objectContaining({
+            id: "source:pool",
+            providers: expect.not.arrayContaining([
+              expect.objectContaining({ providerId: "claude-code" }),
+            ]),
+          }),
+        ]),
+      },
+    });
+    expect(
+      rpc.mock.calls.filter(
+        ([args]) =>
+          args.method === usageFetchMethod &&
+          args.input.resourceId === "claude",
+      ),
+    ).toHaveLength(claudeFetches);
     enabled = false;
     expect(
       await host.harness.behavior.callRpc("getUsage", request),
@@ -224,7 +271,6 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
           id: "host",
           providers: [
             { providerId: "codex", usage: { status: "unsupported" } },
-            { providerId: "claude-code", usage: { status: "unsupported" } },
           ],
         },
       ],
@@ -417,7 +463,12 @@ it("collapses known account observations per machine, preserves unknown identiti
           makeHostResponse({ id: "host", status: "connected" }),
         ],
       },
-      providers: { list: async () => [] },
+      providers: {
+        list: async () => [
+          { id: "codex", displayName: "Codex", logoUrl: null },
+          { id: "other", displayName: "Other", logoUrl: null },
+        ],
+      },
       plugins: {
         experimental_discoverRpc: async () => [
           { pluginId: "adapter", displayName: "Adapter" },
@@ -614,7 +665,6 @@ it("exposes bounded all-provider limits, preserves freshness and unknowns, and s
                 providerId: "devin",
                 usage: { status: "unauthenticated" },
               }),
-              expect.objectContaining({ providerId: "disabled", usage: null }),
             ]),
           },
         ],

@@ -69,3 +69,10 @@ export function readCachedProviderOrder(
   return queryClient.getQueryData<SystemConfigResponse>(systemConfigQueryKey())
     ?.generalSettings.providerOrder;
 }
+
+export function readCachedDisabledProviderIds(
+  queryClient: QueryClient,
+): readonly string[] | undefined {
+  return queryClient.getQueryData<SystemConfigResponse>(systemConfigQueryKey())
+    ?.generalSettings.disabledProviderIds;
+}

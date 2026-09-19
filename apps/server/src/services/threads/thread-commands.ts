@@ -47,6 +47,7 @@ import {
   requireBridgeLaunchForProviderId,
   resolveBridgeLaunchForProviderId,
 } from "../system/provider-bridge-launch.js";
+import { requireProviderEnabled } from "../providers/provider-eligibility.js";
 
 type ExecutionOptionsRequest = ExistingThreadExecutionInputRequest;
 
@@ -265,6 +266,7 @@ export async function buildThreadStartCommand(
   deps: LoggedWorkSessionDeps,
   args: ThreadStartCommandArgs,
 ): Promise<Extract<HostDaemonCommand, { type: "thread.start" }>> {
+  requireProviderEnabled(deps.db, args.providerId);
   await deps.providerRegistry.whenRegistrationsSettled();
   const runtimeContext = await resolveThreadRuntimeCommandConfig(deps, {
     thread: args.thread,

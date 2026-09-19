@@ -3,13 +3,13 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it } from "vitest";
 import { createFactoryService } from "./service.js";
 import { createStore } from "./data.js";
-import { factoryHostContract, specSchema, type FactorySpec } from "./shared.js";
+import { factoryHostContract, specSchema } from "./shared.js";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-const spec: FactorySpec = {
+const spec = specSchema.parse({
   goal: "Reserve last place",
   scope: "Booking service",
   requirements: [
@@ -38,7 +38,7 @@ const spec: FactorySpec = {
       required: true,
     },
   ],
-};
+});
 function fixture() {
   const connection = createConnection(":memory:");
   migrate(connection);
@@ -295,8 +295,14 @@ function fixture() {
     nativeFailure(value: boolean) {
       nativeFailure = value;
     },
-    create: (definition = spec) =>
-      service.createTask({ threadId: "thread", spec: definition }),
+    create: async (definition = spec) => {
+      const created = await service.createTask({
+        threadId: "thread",
+        spec: definition,
+      });
+      await service.startTask({ taskId: created.task.id, expectedVersion: 1 });
+      return created;
+    },
   };
 }
 const assignment = (id: string, environmentId = "env") => ({
@@ -350,7 +356,13 @@ describe("Factory acceptance against real SQLite migrations", () => {
       ...spec,
       requirements: [
         ...spec.requirements,
-        { id: "R2", text: "Waitlist loser", criterion: "automated" },
+        {
+          id: "R2",
+          text: "Waitlist loser",
+          criterion: "automated",
+          reviewInstructions: "",
+          artifactRefs: [],
+        },
       ],
     });
     expect((await f.service.verifyTask(task.id)).task.status).toBe(
@@ -410,7 +422,13 @@ describe("Factory acceptance against real SQLite migrations", () => {
     const { task } = await f.create({
       ...spec,
       requirements: [
-        { id: "R1", text: "Review visual design", criterion: "human" },
+        {
+          id: "R1",
+          text: "Review visual design",
+          criterion: "human",
+          reviewInstructions: "",
+          artifactRefs: [],
+        },
       ],
       checks: [],
     });
@@ -683,5 +701,236 @@ describe("Factory native associations and Team selection", () => {
       }),
     ).rejects.toThrow("aliases");
     expect(f.starts).toBe(0);
+  });
+});
+
+describe("Factory living specification lifecycle and review evidence", () => {
+  it("keeps new tasks draft until an explicit version-guarded start", async () => {
+    const f = fixture();
+    const created = await f.service.createTask({ threadId: "thread", spec });
+    expect(created.task.phase).toBe("draft");
+    expect((await f.service.getTaskDetail(created.task.id)).task.status).toBe(
+      "unverified",
+    );
+    await expect(f.service.verifyTask(created.task.id)).rejects.toThrow(
+      "active task",
+    );
+    await expect(
+      f.service.assign({
+        taskId: created.task.id,
+        launchId: "draft",
+        assignments: [assignment("draft-worker")],
+      }),
+    ).rejects.toThrow("active task");
+    const revised = await f.service.updateTask({
+      taskId: created.task.id,
+      expectedVersion: 1,
+      spec: { ...spec, goal: "Revised draft" },
+      changeReason: "Clarified before start",
+    });
+    expect(revised.task.phase).toBe("draft");
+    await expect(
+      f.service.startTask({ taskId: created.task.id, expectedVersion: 1 }),
+    ).rejects.toThrow("Specification changed");
+    const started = await f.service.startTask({
+      taskId: created.task.id,
+      expectedVersion: 2,
+    });
+    expect(started.task.phase).toBe("active");
+    expect((await f.service.verifyTask(created.task.id)).task.status).toBe(
+      "accepted",
+    );
+  });
+
+  it("uses latest current agent review and rejects stale or incomplete review evidence", async () => {
+    const f = fixture();
+    const agentSpec = specSchema.parse({
+      ...spec,
+      requirements: [
+        {
+          id: "R1",
+          text: "Review the implementation semantics",
+          criterion: "agent",
+          reviewInstructions: "Inspect the concurrency boundary",
+          artifactRefs: ["src/booking.ts"],
+        },
+      ],
+      checks: [],
+    });
+    const { task } = await f.create(agentSpec);
+    const accepted = await f.service.review({
+      taskId: task.id,
+      requirementIds: ["R1"],
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      reviewer: "review-agent",
+      summary: "Locking covers the last-place race",
+      limitations: "Did not inspect unrelated booking flows",
+      artifactRefs: ["review://race-analysis"],
+      accepted: true,
+    });
+    expect(accepted.task.status).toBe("accepted");
+    const rejected = await f.service.review({
+      taskId: task.id,
+      requirementIds: ["R1"],
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+      reviewer: "review-agent",
+      summary: "A second race path bypasses the lock",
+      limitations: "",
+      artifactRefs: ["review://race-counterexample"],
+      accepted: false,
+    });
+    expect(rejected.task.status).toBe("failed");
+    expect(rejected.reviews).toHaveLength(2);
+    f.setFingerprint("content-v2");
+    await expect(
+      f.service.review({
+        taskId: task.id,
+        requirementIds: ["R1"],
+        expectedVersion: 1,
+        expectedFingerprint: "content-v1",
+        reviewer: "review-agent",
+        summary: "Stale pass",
+        limitations: "",
+        artifactRefs: ["review://stale"],
+        accepted: true,
+      }),
+    ).rejects.toThrow("changed since review");
+    expect(createStore(f.connection.$client).get(task.id).reviews).toHaveLength(
+      2,
+    );
+  });
+
+  it("validates a human batch completely before atomically recording it", async () => {
+    const f = fixture();
+    const humanSpec = specSchema.parse({
+      ...spec,
+      requirements: [
+        { id: "H1", text: "Visual hierarchy", criterion: "human" },
+        { id: "H2", text: "Wording", criterion: "human" },
+        { id: "A1", text: "Automated behavior", criterion: "automated" },
+      ],
+      scenarios: [],
+      checks: [
+        {
+          ...spec.checks[0],
+          requirementIds: ["A1"],
+        },
+      ],
+    });
+    const { task } = await f.create(humanSpec);
+    await f.service.verifyTask(task.id);
+    const input = {
+      taskId: task.id,
+      accepted: true,
+      actor: "user",
+      rationale: "",
+      humanConfirmed: true as const,
+      expectedVersion: 1,
+      expectedFingerprint: "content-v1",
+    };
+    expect(() =>
+      f.service.judgeMany({ ...input, requirementIds: [] }),
+    ).toThrow();
+    await expect(
+      f.service.judgeMany({ ...input, requirementIds: ["H1", "A1"] }),
+    ).rejects.toThrow("human criteria");
+    await expect(
+      f.service.judgeMany({ ...input, requirementIds: ["H1", "H1"] }),
+    ).rejects.toThrow("unique");
+    expect(createStore(f.connection.$client).get(task.id).judgments).toEqual(
+      [],
+    );
+    const judged = await f.service.judgeMany({
+      ...input,
+      requirementIds: ["H1", "H2"],
+    });
+    expect(judged.judgments.map((judgment) => judgment.rationale)).toEqual([
+      "Accepted reviewed requirements",
+      "Accepted reviewed requirements",
+    ]);
+    expect(judged.task.status).toBe("accepted");
+    expect(
+      f.connection.$client
+        .prepare(
+          "SELECT COUNT(*) FROM factory_artifacts WHERE task_id = ? AND kind = 'human-judgment'",
+        )
+        .pluck()
+        .get(task.id),
+    ).toBe(2);
+  });
+
+  it("persists immutable notes with the available content identity", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    const first = await f.service.note({
+      taskId: task.id,
+      kind: "decision",
+      text: "Use a database uniqueness constraint",
+      artifactRefs: ["docs/decision.md"],
+    });
+    expect(first.notes[0].fingerprint).toBe("content-v1");
+    f.setComplete(false);
+    const second = await f.service.note({
+      taskId: task.id,
+      kind: "blocker",
+      text: "Workspace identity is temporarily unavailable",
+      artifactRefs: [],
+    });
+    expect(second.notes[1].fingerprint).toBeNull();
+    expect(() =>
+      f.connection.$client
+        .prepare("DELETE FROM factory_artifacts WHERE kind = 'note'")
+        .run(),
+    ).toThrow("immutable");
+  });
+
+  it("loads legacy task JSON with active phase and additive defaults", async () => {
+    const f = fixture();
+    const created = await f.service.createTask({ threadId: "thread", spec });
+    const raw = JSON.parse(
+      String(
+        f.connection.$client
+          .prepare("SELECT value FROM factory_tasks WHERE id = ?")
+          .pluck()
+          .get(created.task.id),
+      ),
+    );
+    delete raw.task.problem;
+    delete raw.task.outcome;
+    delete raw.task.teamPlan;
+    delete raw.task.phase;
+    delete raw.reviews;
+    delete raw.notes;
+    for (const requirement of raw.task.requirements) {
+      delete requirement.reviewInstructions;
+      delete requirement.artifactRefs;
+    }
+    for (const version of raw.specs) {
+      delete version.spec.problem;
+      delete version.spec.outcome;
+      delete version.spec.teamPlan;
+      for (const requirement of version.spec.requirements) {
+        delete requirement.reviewInstructions;
+        delete requirement.artifactRefs;
+      }
+    }
+    f.connection.$client
+      .prepare("UPDATE factory_tasks SET value = ? WHERE id = ?")
+      .run(JSON.stringify(raw), created.task.id);
+    const loaded = createStore(f.connection.$client).get(created.task.id);
+    expect(loaded.task).toMatchObject({
+      phase: "active",
+      problem: "",
+      outcome: "",
+      teamPlan: [],
+    });
+    expect(loaded.task.requirements[0]).toMatchObject({
+      reviewInstructions: "",
+      artifactRefs: [],
+    });
+    expect(loaded.reviews).toEqual([]);
+    expect(loaded.notes).toEqual([]);
   });
 });

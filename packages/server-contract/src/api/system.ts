@@ -84,10 +84,26 @@ export const systemProvidersQuerySchema = z
   .object({
     ...systemProviderHostQueryFields,
     capability: z.enum(["usage"]),
+    includeDisabled: z.enum(["true", "false"]),
   })
   .partial()
   .superRefine(rejectMultipleWorkspaceSelectors);
 export type SystemProvidersQuery = z.infer<typeof systemProvidersQuerySchema>;
+
+export const systemProviderEnabledUpdateSchema = z
+  .object({ enabled: z.boolean() })
+  .strict();
+export type SystemProviderEnabledUpdate = z.infer<
+  typeof systemProviderEnabledUpdateSchema
+>;
+
+export const systemProviderEnabledResponseSchema = z.object({
+  providerId: z.string().min(1),
+  enabled: z.boolean(),
+});
+export type SystemProviderEnabledResponse = z.infer<
+  typeof systemProviderEnabledResponseSchema
+>;
 
 export const systemExecutionOptionsQuerySchema = z
   .object({

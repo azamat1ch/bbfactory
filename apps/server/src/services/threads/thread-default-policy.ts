@@ -35,31 +35,47 @@ const DEFAULT_PERMISSION_MODE: PermissionMode = "auto";
 
 function listDefaultProviderIdCandidates(
   registry: ProviderRegistryService,
+  disabledProviderIds: readonly string[],
 ): string[] {
   const available = registry
     .list()
     .filter((registration) => registration.info.available)
     .map((registration) => registration.info.id);
   const preferred = registry.getUserDefaultProviderId();
-  if (preferred !== null && available.includes(preferred)) {
-    return [preferred, ...available.filter((id) => id !== preferred)];
+  if (
+    preferred !== null &&
+    (available.includes(preferred) || disabledProviderIds.includes(preferred))
+  ) {
+    return [
+      preferred,
+      ...available.filter(
+        (id) => id !== preferred && !disabledProviderIds.includes(id),
+      ),
+    ];
   }
-  return available;
+  return available.filter((id) => !disabledProviderIds.includes(id));
 }
 
-function requireDefaultProviderId(registry: ProviderRegistryService): string {
-  const providerId = listDefaultProviderIdCandidates(registry)[0];
+function requireDefaultProviderId(
+  registry: ProviderRegistryService,
+  disabledProviderIds: readonly string[],
+): string {
+  const providerId = listDefaultProviderIdCandidates(
+    registry,
+    disabledProviderIds,
+  )[0];
   if (providerId === undefined) {
     throw new ApiError(
       409,
       "no_provider_available",
-      "No agent provider is enabled. Enable an agent provider plugin in Settings → Plugins to start a thread.",
+      "No agent provider is enabled. Enable a provider in Settings → Providers to start a thread.",
     );
   }
   return providerId;
 }
 
 interface ResolveCreateThreadExecutionDefaultsArgs {
+  disabledProviderIds?: readonly string[];
   requestedProviderId?: string;
   storedDefaults: ProjectExecutionDefaults | null;
 }
@@ -183,16 +199,24 @@ export function resolveCreateThreadExecutionDefaults(
   registry: ProviderRegistryService,
   args: ResolveCreateThreadExecutionDefaultsArgs,
 ): CreateThreadExecutionDefaultsResolved {
+  const disabledProviderIds = args.disabledProviderIds ?? [];
   const isProductDefault =
     args.requestedProviderId === undefined &&
     args.storedDefaults?.providerId === undefined;
   const defaultCandidates = isProductDefault
-    ? listDefaultProviderIdCandidates(registry)
+    ? listDefaultProviderIdCandidates(registry, disabledProviderIds)
     : [];
   const providerId =
     args.requestedProviderId ??
     args.storedDefaults?.providerId ??
-    requireDefaultProviderId(registry);
+    requireDefaultProviderId(registry, disabledProviderIds);
+  if (disabledProviderIds.includes(providerId)) {
+    throw new ApiError(
+      409,
+      "provider_disabled",
+      `Provider '${providerId}' is disabled. Enable it in Settings → Providers before starting new work.`,
+    );
+  }
   const registration = registry.get(providerId);
   if (registration !== null && !registration.info.available) {
     throw new ApiError(

@@ -447,6 +447,7 @@ type SystemProvidersQueryKey = readonly [
   string | null,
   string | null,
   "usage" | null,
+  boolean,
 ];
 type AllSystemProvidersQueryKeyPrefix = readonly [
   typeof SYSTEM_PROVIDERS_QUERY_KEY,
@@ -1077,6 +1078,7 @@ interface SystemProvidersQueryKeyArgs {
   capability?: "usage" | null;
   environmentId?: string | null;
   hostId?: string | null;
+  includeDisabled?: boolean;
 }
 
 export function systemProvidersQueryKey(
@@ -1087,6 +1089,7 @@ export function systemProvidersQueryKey(
     args.environmentId ?? null,
     args.hostId ?? null,
     args.capability ?? null,
+    args.includeDisabled ?? false,
   ];
 }
 

@@ -150,6 +150,37 @@ describe("resolveCreateThreadExecutionDefaults", () => {
     ).toBe("pi");
   });
 
+  it.each([true, false])(
+    "rejects a disabled saved global default (available: %s) without blocking an explicit enabled provider",
+    async (available) => {
+      const userRegistry = createProviderRegistryService({
+        readUserProviderPreferences: () => ({
+          providerOrder: ["acp-devin", "codex"],
+          defaultProviderId: "codex",
+        }),
+      });
+      await registerFirstPartyProviders(userRegistry, {
+        unavailablePluginIds: available ? [] : ["provider-codex"],
+      });
+
+      expect(() =>
+        resolveCreateThreadExecutionDefaults(userRegistry, {
+          disabledProviderIds: ["codex"],
+          storedDefaults: null,
+        }),
+      ).toThrow(
+        "Provider 'codex' is disabled. Enable it in Settings → Providers before starting new work.",
+      );
+      expect(
+        resolveCreateThreadExecutionDefaults(userRegistry, {
+          disabledProviderIds: ["codex"],
+          requestedProviderId: "acp-devin",
+          storedDefaults: null,
+        }).providerId,
+      ).toBe("acp-devin");
+    },
+  );
+
   it("orders fallback candidates behind the chosen default, preferred provider first", async () => {
     const preferences = {
       providerOrder: ["pi", "claude-code"],
@@ -191,6 +222,42 @@ describe("resolveCreateThreadExecutionDefaults", () => {
         storedDefaults: makeDefaults({ providerId: "codex" }),
       }).providerFallbackCandidates,
     ).toEqual([]);
+  });
+
+  it("rejects disabled explicit and stored providers without fallback", () => {
+    for (const input of [
+      {
+        requestedProviderId: "acp-devin",
+        storedDefaults: null,
+      },
+      {
+        storedDefaults: makeDefaults({ providerId: "acp-devin" }),
+      },
+    ]) {
+      expect(() =>
+        resolveCreateThreadExecutionDefaults(registry, {
+          ...input,
+          disabledProviderIds: ["acp-devin"],
+        }),
+      ).toThrow(
+        "Provider 'acp-devin' is disabled. Enable it in Settings → Providers before starting new work.",
+      );
+    }
+  });
+
+  it("disables only the exact ACP provider and restores it when enabled", () => {
+    const disabled = resolveCreateThreadExecutionDefaults(registry, {
+      storedDefaults: null,
+      disabledProviderIds: ["acp-devin"],
+    });
+    expect(disabled.providerFallbackCandidates).toContain("acp-opencode");
+    expect(disabled.providerFallbackCandidates).not.toContain("acp-devin");
+    expect(
+      resolveCreateThreadExecutionDefaults(registry, {
+        storedDefaults: null,
+        disabledProviderIds: [],
+      }).providerFallbackCandidates,
+    ).toContain("acp-devin");
   });
 
   it("discards stored defaults when the resolved provider changes", () => {

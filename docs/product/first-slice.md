@@ -44,6 +44,16 @@ Team composition, guidance and usage, plus their typechecks and the full build.
 
 ## Remaining acceptance
 
+The living-spec follow-up adds a draft/start boundary, evidence-backed agent
+reviews, atomic human review batches, versioned notes, a larger-spec card and
+individual provider controls. The lead completed 172 relevant tests and affected-package typechecks using
+serialized Turbo tasks, one Vitest worker and a bounded Node heap. An isolated
+optimized app exercised pagination and method filters for 100 requirements,
+explicit start, grouped human controls, a real linked service check updating
+95 synthetic requirements to accepted, and provider disabling with discovery
+filtering. Human judgments were not recorded. This fixture does not establish
+subjective usability acceptance or the full delivery route below.
+
 Complete a real feature through the running app: agree requirements, implement
 directly or delegate, review, correct findings, and verify the final integrated
 content. Exercise restart and uncertain stop through the same runtime. A canned

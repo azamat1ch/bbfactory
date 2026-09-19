@@ -261,6 +261,9 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
       providerSeen.add(provider.id);
       providers.push(provider);
     }
+    const enabledProviderIds = new Set(
+      providers.map((provider) => provider.id),
+    );
     hosts.sort(
       (a, b) =>
         Number(b.id === config?.primaryHostId) -
@@ -311,6 +314,7 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
     const selected = [...inventories.values()].flatMap((source) =>
       source.resources
         .filter((resource) => {
+          if (!enabledProviderIds.has(resource.providerId)) return false;
           const machineId =
             resource.scope.kind === "shared"
               ? `source:${source.pluginId}`
@@ -385,6 +389,7 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
           error: source.error,
         });
       for (const resource of source.resources) {
+        if (!enabledProviderIds.has(resource.providerId)) continue;
         const machineId =
           resource.scope.kind === "shared"
             ? `source:${source.pluginId}`

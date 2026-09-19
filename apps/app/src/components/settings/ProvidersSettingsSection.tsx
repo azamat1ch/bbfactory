@@ -106,7 +106,7 @@ function ProviderRowIcon({ provider }: { provider: ProviderInfo }) {
 interface SortableProviderRowProps {
   disabled: boolean;
   generalSettings: AppSettings;
-  index: number;
+  implicitDefaultProviderId: string | null;
   onGeneralSettingsChange: ProvidersSettingsSectionProps["onGeneralSettingsChange"];
   provider: ProviderInfo;
 }
@@ -114,7 +114,7 @@ interface SortableProviderRowProps {
 function SortableProviderRow({
   disabled,
   generalSettings,
-  index,
+  implicitDefaultProviderId,
   onGeneralSettingsChange,
   provider,
 }: SortableProviderRowProps) {
@@ -124,8 +124,11 @@ function SortableProviderRow({
     label: provider.displayName,
   });
   const isDefault =
-    generalSettings.defaultProviderId === provider.id ||
-    (generalSettings.defaultProviderId === null && index === 0);
+    !generalSettings.disabledProviderIds.includes(provider.id) &&
+    (generalSettings.defaultProviderId === provider.id ||
+      (generalSettings.defaultProviderId === null &&
+        implicitDefaultProviderId === provider.id));
+  const enabled = !generalSettings.disabledProviderIds.includes(provider.id);
 
   return (
     <SettingsRow
@@ -142,13 +145,14 @@ function SortableProviderRow({
         {provider.displayName}
       </span>
       {!provider.available ? <SettingsBadge>Unavailable</SettingsBadge> : null}
+      {!enabled ? <SettingsBadge>Disabled</SettingsBadge> : null}
       {isDefault ? (
         <SettingsBadge>Default</SettingsBadge>
       ) : (
         <Button
           variant="ghost"
           size="sm"
-          disabled={disabled || !provider.available}
+          disabled={disabled || !provider.available || !enabled}
           onClick={() =>
             onGeneralSettingsChange({
               ...generalSettings,
@@ -159,6 +163,21 @@ function SortableProviderRow({
           Make default
         </Button>
       )}
+      <Switch
+        checked={enabled}
+        disabled={disabled}
+        aria-label={`${enabled ? "Disable" : "Enable"} ${provider.displayName}`}
+        onCheckedChange={(checked) =>
+          onGeneralSettingsChange({
+            ...generalSettings,
+            disabledProviderIds: checked
+              ? generalSettings.disabledProviderIds.filter(
+                  (id) => id !== provider.id,
+                )
+              : [...generalSettings.disabledProviderIds, provider.id],
+          })
+        }
+      />
     </SettingsRow>
   );
 }
@@ -208,11 +227,17 @@ export function ProvidersSettingsSection({
   generalSettings,
   onGeneralSettingsChange,
 }: ProvidersSettingsSectionProps) {
-  const providersQuery = useSystemProviders();
+  const providersQuery = useSystemProviders({ includeDisabled: true });
   const serverProviders: ProviderInfo[] = providersQuery.data ?? [];
   const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
   const providers = applyProviderOrder(serverProviders, optimisticOrder);
   const ids = providers.map((provider) => provider.id);
+  const implicitDefaultProviderId =
+    providers.find(
+      (provider) =>
+        provider.available &&
+        !generalSettings.disabledProviderIds.includes(provider.id),
+    )?.id ?? null;
 
   const handleReorder = (activeId: string, overId: string): void => {
     const next = reorderProviderIds(ids, activeId, overId);
@@ -243,7 +268,7 @@ export function ProvidersSettingsSection({
           <p className="text-sm text-muted-foreground">Loading providers…</p>
         ) : providers.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No agent provider is enabled. Enable a provider plugin under
+            No agent provider is installed. Install a provider plugin under
             Plugins.
           </p>
         ) : (
@@ -252,12 +277,12 @@ export function ProvidersSettingsSection({
             disabled={disabled}
             onReorder={handleReorder}
           >
-            {providers.map((provider, index) => (
+            {providers.map((provider) => (
               <SortableProviderRow
                 key={provider.id}
                 disabled={disabled}
                 generalSettings={generalSettings}
-                index={index}
+                implicitDefaultProviderId={implicitDefaultProviderId}
                 onGeneralSettingsChange={onGeneralSettingsChange}
                 provider={provider}
               />

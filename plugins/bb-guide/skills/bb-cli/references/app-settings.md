@@ -106,6 +106,12 @@ every window and client sees the same value.
 
 ## Provider order and default
 
+- `disabledProviderIds` defaults to `[]` and stores exact provider IDs. Prefer
+  `bb provider enable <provider-id>` and `bb provider disable <provider-id>` to
+  change it. `bb provider list --all` includes disabled installed providers.
+- Disabled providers are excluded from new choices and usage polling. A saved
+  disabled selection is rejected; existing thread history and running workers
+  remain available.
 - `providerOrder` defaults to `[]`. Set it to a JSON array of provider IDs.
 - `defaultProviderId` defaults to `null`. Set a provider ID or use `null` to
   clear it.

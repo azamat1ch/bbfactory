@@ -16,6 +16,7 @@ export type ProviderHostRoutingArgs =
 
 export type ProviderListArgs = ProviderHostRoutingArgs & {
   capability?: SystemProvidersQuery["capability"];
+  includeDisabled?: boolean;
   signal?: AbortSignal;
 };
 export type ProviderModelsArgs = ProviderHostRoutingArgs & {
@@ -29,6 +30,11 @@ export type ProviderModelsResult = SystemExecutionOptionsResponse;
 export interface ProvidersArea {
   list(args?: ProviderListArgs): Promise<ProviderListResult>;
   models(args?: ProviderModelsArgs): Promise<ProviderModelsResult>;
+  experimental_setEnabled(args: {
+    providerId: string;
+    enabled: boolean;
+    signal?: AbortSignal;
+  }): Promise<{ providerId: string; enabled: boolean }>;
 }
 
 export function createProvidersArea(args: CreateSdkAreaArgs): ProvidersArea {
@@ -39,9 +45,18 @@ export function createProvidersArea(args: CreateSdkAreaArgs): ProvidersArea {
         transport.api.v1.system.providers.$get(
           {
             query: {
-              capability: input.capability,
-              environmentId: input.environmentId,
-              hostId: input.hostId,
+              ...(input.capability === undefined
+                ? {}
+                : { capability: input.capability }),
+              ...(input.includeDisabled === undefined
+                ? {}
+                : {
+                    includeDisabled: input.includeDisabled ? "true" : "false",
+                  }),
+              ...(input.environmentId === undefined
+                ? {}
+                : { environmentId: input.environmentId }),
+              ...(input.hostId === undefined ? {} : { hostId: input.hostId }),
             },
           },
           ...signalRequestArgs(input.signal),
@@ -50,6 +65,17 @@ export function createProvidersArea(args: CreateSdkAreaArgs): ProvidersArea {
     },
     async models(input = {}) {
       return readExecutionOptions(transport, input);
+    },
+    async experimental_setEnabled(input) {
+      return transport.readJson(
+        transport.api.v1.system.providers[":id"].enabled.$put(
+          {
+            param: { id: input.providerId },
+            json: { enabled: input.enabled },
+          },
+          ...signalRequestArgs(input.signal),
+        ),
+      );
     },
   };
 }

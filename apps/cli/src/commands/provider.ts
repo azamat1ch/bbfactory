@@ -8,6 +8,7 @@ import { outputJson } from "./helpers.js";
 import { resolveMachineEnvironmentRouting } from "./machine.js";
 
 interface ProviderListCommandOptions {
+  all?: boolean;
   environment?: string;
   host?: string;
   json?: boolean;
@@ -48,14 +49,16 @@ export function registerProviderCommands(
 
   addProviderRoutingOptions(provider.command("list"))
     .description("List available providers")
+    .option("--all", "Include disabled installed providers")
     .option("--json", "Print machine-readable JSON output")
     .action(
       action(async (opts: ProviderListCommandOptions) => {
         const serverUrl = getUrl();
         const sdk = createCliBbSdk(serverUrl);
-        const providers = await sdk.providers.list(
-          await resolveMachineEnvironmentRouting(opts, serverUrl),
-        );
+        const providers = await sdk.providers.list({
+          ...(await resolveMachineEnvironmentRouting(opts, serverUrl)),
+          ...(opts.all ? { includeDisabled: true } : {}),
+        });
         if (outputJson(opts, providers)) return;
         if (providers.length === 0) {
           console.log("No providers available");
@@ -64,6 +67,40 @@ export function registerProviderCommands(
         printProviderTable(providers);
       }),
     );
+
+  for (const enabled of [true, false]) {
+    const verb = enabled ? "enable" : "disable";
+    provider
+      .command(`${verb} <providerId>`)
+      .description(`${enabled ? "Enable" : "Disable"} a provider for new work`)
+      .option("--json", "Print machine-readable JSON output")
+      .action(
+        action(async (providerId: string, opts: { json?: boolean }) => {
+          const sdk = createCliBbSdk(getUrl());
+          const providers = await sdk.providers.list({
+            includeDisabled: true,
+          });
+          const selected = providers.find(
+            (candidate) => candidate.id === providerId,
+          );
+          if (selected === undefined) {
+            throw new Error(
+              `Unknown provider '${providerId}'. Known providers: ${providers
+                .map((candidate) => candidate.id)
+                .join(", ")}.`,
+            );
+          }
+          const result = await sdk.providers.experimental_setEnabled({
+            providerId,
+            enabled,
+          });
+          if (outputJson(opts, result)) return;
+          console.log(
+            `${selected.displayName} ${enabled ? "enabled" : "disabled"}`,
+          );
+        }),
+      );
+  }
 
   addProviderRoutingOptions(provider.command("models [providerId]"))
     .description("List available models for a provider")

@@ -122,7 +122,8 @@ function GoalCard({
       <span className="factory-goal-copy">
         <span className="factory-goal-title">{task.goal}</span>
         <span className="factory-meta">
-          Spec v{task.specVersion} · {task.requirements.length}{" "}
+          {task.phase === "draft" ? "Draft · " : ""}Spec v{task.specVersion} ·{" "}
+          {task.requirements.length}{" "}
           {task.requirements.length === 1 ? "requirement" : "requirements"}
           {task.archived
             ? " · Archived"
@@ -133,6 +134,8 @@ function GoalCard({
       </span>
       {unavailable ? (
         <span className="factory-meta">Status unavailable</span>
+      ) : task.phase === "draft" ? (
+        <Status value="draft" />
       ) : (
         <Status value={task.status} />
       )}

@@ -71,6 +71,78 @@ async function providerIds(response: Response): Promise<string[]> {
 }
 
 describe("system provider host routing", () => {
+  it("persists exact provider disablement, hides new choices, and reenables", async () => {
+    await withTestHarness({}, async (harness) => {
+      const { host, session } = seedHostSession(harness.deps);
+      seedPrimaryHost(harness.deps, host.id);
+      registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: (request) => {
+          if (request.command.type === "provider.health") {
+            return providerHostResponse(
+              request,
+              ["acp-devin", "acp-opencode"].includes(request.command.providerId)
+                ? request.command.providerId
+                : "",
+              "model",
+            );
+          }
+          return providerHostResponse(request, "acp-devin", "model");
+        },
+      });
+
+      const disable = await harness.app.request(
+        "/api/v1/system/providers/acp-devin/enabled",
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ enabled: false }),
+        },
+      );
+      expect(disable.status).toBe(200);
+      expect(getAppSettings(harness.db).disabledProviderIds).toEqual([
+        "acp-devin",
+      ]);
+      const enabledIds = await providerIds(
+        await harness.app.request("/api/v1/system/providers"),
+      );
+      expect(enabledIds).toContain("acp-opencode");
+      expect(enabledIds).not.toContain("acp-devin");
+      const installedIds = await providerIds(
+        await harness.app.request(
+          "/api/v1/system/providers?includeDisabled=true",
+        ),
+      );
+      expect(installedIds).toEqual(
+        expect.arrayContaining(["acp-devin", "acp-opencode"]),
+      );
+      const models = await harness.app.request(
+        "/api/v1/system/execution-options?providerId=acp-devin",
+      );
+      expect(models.status).toBe(409);
+      expect(await readJson(models)).toMatchObject({
+        code: "provider_disabled",
+      });
+
+      const enable = await harness.app.request(
+        "/api/v1/system/providers/acp-devin/enabled",
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ enabled: true }),
+        },
+      );
+      expect(enable.status).toBe(200);
+      expect(getAppSettings(harness.db).disabledProviderIds).toEqual([]);
+      expect(
+        await providerIds(
+          await harness.app.request("/api/v1/system/providers"),
+        ),
+      ).toContain("acp-devin");
+    });
+  });
+
   it("separates provider discovery by explicit host and environment host while preserving primary fallback", async () => {
     await withTestHarness({}, async (harness) => {
       const primary = seedHostSession(harness.deps, {

@@ -88,7 +88,9 @@ type SystemProviderRoutingArgs =
 
 type UseSystemProvidersArgs = QueryOptions &
   SystemProviderRoutingArgs &
-  Pick<SystemProvidersQuery, "capability">;
+  Pick<SystemProvidersQuery, "capability"> & {
+    includeDisabled?: boolean;
+  };
 
 type UseSystemProviderInfoArgs = UseSystemProvidersArgs & {
   providerId?: string;
@@ -225,28 +227,41 @@ export function useSystemProviders(args: UseSystemProvidersArgs = {}) {
   const capability = args.capability ?? null;
   const environmentId = args.environmentId ?? null;
   const hostId = args.hostId ?? null;
+  const includeDisabled = args.includeDisabled ?? false;
   const enabled = args.enabled ?? true;
   useSystemRealtimeSubscription({ enabled });
   const providersCacheKey = providerListCacheKey({ environmentId, hostId });
   return useQuery<ProviderInfo[]>({
-    queryKey: systemProvidersQueryKey({ capability, environmentId, hostId }),
+    queryKey: systemProvidersQueryKey({
+      capability,
+      environmentId,
+      hostId,
+      includeDisabled,
+    }),
     queryFn: async ({ signal }) => {
       const capabilityFilter =
         args.capability === undefined ? {} : { capability: args.capability };
+      const disabledFilter = includeDisabled ? { includeDisabled: true } : {};
       const providers = await (args.environmentId !== undefined
         ? sdk.providers.list({
             ...capabilityFilter,
+            ...disabledFilter,
             environmentId: args.environmentId,
             signal,
           })
         : args.hostId !== undefined
           ? sdk.providers.list({
               ...capabilityFilter,
+              ...disabledFilter,
               hostId: args.hostId,
               signal,
             })
-          : sdk.providers.list({ ...capabilityFilter, signal }));
-      if (capability === null) {
+          : sdk.providers.list({
+              ...capabilityFilter,
+              ...disabledFilter,
+              signal,
+            }));
+      if (capability === null && !includeDisabled) {
         writeCachedProviderList(providersCacheKey, providers);
       }
       return providers;
@@ -254,6 +269,7 @@ export function useSystemProviders(args: UseSystemProvidersArgs = {}) {
     enabled,
     staleTime: 60_000,
     placeholderData: () => {
+      if (includeDisabled) return undefined;
       const remembered = readCachedProviderList(providersCacheKey);
       if (remembered === null) return undefined;
       const eligible =
