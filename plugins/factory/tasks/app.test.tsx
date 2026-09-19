@@ -546,6 +546,9 @@ describe("Factory task evidence", () => {
       "Delivery approved. Verification coverage is shown separately.",
     );
     expect(
+      slot.getByText("Approved", { selector: ".factory-status" }),
+    ).toBeTruthy();
+    expect(
       slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
     ).toBeTruthy();
   });

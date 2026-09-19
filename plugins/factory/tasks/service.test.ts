@@ -400,6 +400,9 @@ describe("Factory acceptance against real SQLite migrations", () => {
     };
     const approved = await f.service.approveDelivery(approval);
     expect(approved.task.status).toBe("accepted");
+    expect(
+      (await f.service.listTasks(approved.task.originThreadId))[0]?.approved,
+    ).toBe(true);
     expect(approved.approvals[0]).toMatchObject({
       source: "chat",
       sourceRef: "thread/message-1",
@@ -409,11 +412,24 @@ describe("Factory acceptance against real SQLite migrations", () => {
     f.fail();
     expect((await f.service.verifyTask(task.id)).task.status).toBe("failed");
     expect((await f.service.getTaskDetail(task.id)).approvals).toHaveLength(1);
+    f.setFingerprint("later-code");
+    expect(
+      (await f.service.listTasks(approved.task.originThreadId))[0]?.approved,
+    ).toBe(true);
+    await f.service.updateTask({
+      taskId: task.id,
+      expectedVersion: 1,
+      spec,
+      changeReason: "Revised agreement",
+    });
+    expect(
+      (await f.service.listTasks(approved.task.originThreadId))[0]?.approved,
+    ).toBe(false);
     await expect(
       f.service.approveDelivery({ ...approval, sourceRef: null }),
     ).rejects.toThrow("source reference");
     await expect(
-      f.service.approveDelivery({ ...approval, expectedVersion: 2 }),
+      f.service.approveDelivery({ ...approval, expectedVersion: 1 }),
     ).rejects.toThrow("changed");
   });
 

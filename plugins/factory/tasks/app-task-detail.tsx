@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@bb/shared-ui/button";
 import { useComposer, useRpc } from "@get-bb/plugin-sdk/app";
-import type { FactoryTaskDetail, factoryRpcContract } from "./shared.js";
+import {
+  specApproved,
+  type FactoryTaskDetail,
+  type factoryRpcContract,
+} from "./shared.js";
 import {
   ArtifactList,
   ErrorNotice,
@@ -295,7 +299,11 @@ export function TaskDetail({
             Spec v{task.specVersion}
             {task.archived ? " · Archived" : ""}
           </span>
-          {detail.deliveries.length > 0 ? (
+          {specApproved(detail) ? (
+            <span className="factory-status" data-status="accepted">
+              Approved
+            </span>
+          ) : detail.deliveries.length > 0 ? (
             <span className="factory-status">Delivered</span>
           ) : unavailable || error ? null : busy === "verify" ||
             busy === "stop" ? (

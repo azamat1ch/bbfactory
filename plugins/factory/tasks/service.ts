@@ -10,6 +10,7 @@ import { teamRpcContract } from "../team/shared.js";
 import { workflowExecutionRpcContract } from "../execution/execution-contract.js";
 import { createStore, migrations } from "./data.js";
 import {
+  specApproved,
   verificationMethods,
   factoryHostContract,
   factoryRpcContract,
@@ -670,7 +671,7 @@ export function createFactoryService(
             (checks.has(d.task.id)
               ? Promise.resolve(store.get(d.task.id))
               : locked(d.task.id, () => refresh(d.task.id, captures))
-            ).then((d) => d.task),
+            ).then((d) => ({ ...d.task, approved: specApproved(d) })),
           ),
       );
     },

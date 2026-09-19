@@ -13,6 +13,7 @@ import {
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import {
+  specApproved,
   FACTORY_PANEL_ACTION_ID,
   FACTORY_TASK_DIRECTIVE_ID,
   FACTORY_TASKS_REALTIME_CHANNEL,
@@ -109,10 +110,12 @@ function useTask(taskId: string | null) {
 
 function GoalCard({
   task,
+  approved = task.approved,
   open,
   unavailable,
 }: {
   task: FactoryTaskView;
+  approved?: boolean;
   open: () => void;
   unavailable?: boolean;
 }) {
@@ -134,6 +137,10 @@ function GoalCard({
       </span>
       {unavailable ? (
         <span className="factory-meta">Status unavailable</span>
+      ) : approved ? (
+        <span className="factory-status" data-status="accepted">
+          Approved
+        </span>
       ) : task.phase === "draft" ? (
         <Status value="draft" />
       ) : (
@@ -200,6 +207,7 @@ function FactoryTaskDirective({
     <div className="factory-card">
       <GoalCard
         task={state.value.task}
+        approved={specApproved(state.value)}
         unavailable={!connected || !!state.error}
         open={() =>
           navigate.openThreadPanel({

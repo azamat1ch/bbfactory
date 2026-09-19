@@ -187,6 +187,7 @@ export const noteSchema = z.strictObject({
   createdAt: z.number(),
 });
 export const taskViewSchema = z.strictObject({
+  approved: z.boolean().optional(),
   id,
   projectId: id,
   originThreadId: id,
@@ -438,3 +439,18 @@ export type FactorySpec = z.infer<typeof specSchema>;
 export type FactoryEvidence = z.infer<typeof evidenceSchema>;
 export type FactoryAssignment = z.infer<typeof assignmentSchema>;
 export type FactoryContent = z.infer<typeof contentSchema>;
+
+export function specApproved(detail: FactoryTaskDetail): boolean {
+  const decisions = new Map<string, boolean>();
+  for (const approval of detail.approvals) {
+    if (approval.specVersion !== detail.task.specVersion) continue;
+    for (const id of approval.requirementIds)
+      decisions.set(id, approval.accepted);
+  }
+  return (
+    detail.task.requirements.length > 0 &&
+    detail.task.requirements.every(
+      (requirement) => decisions.get(requirement.id) === true,
+    )
+  );
+}

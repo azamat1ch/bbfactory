@@ -10,6 +10,11 @@ Presented specs open in the side panel once per message in the browser session;
 closing the panel is respected. Existing references can opt in with
 `::factory-task{taskId="<id>" open="true"}`.
 
+The card shows Approved when human decisions cover every requirement in the
+current spec revision, including approvals made across multiple selections.
+Later code edits affect verification coverage, not that recorded decision; a new
+spec revision needs new approval.
+
 The card shows outcome, scope and requirements. Expand a requirement for scenarios
 and evidence; approve the delivery or selected rows. Select all includes every
 requirement across pages and filters. Drafts are refined and activated in chat. Put detailed decisions in
