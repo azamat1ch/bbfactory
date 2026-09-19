@@ -2,20 +2,21 @@
 
 This internal module is composed into the single [Factory plugin](../factory-team/README.md). Do not install it as a second plugin.
 
-Factory persists versioned requirements, optional behavioral scenarios, links to actual project tests, immutable check evidence, native assignment associations, review findings and explicit human judgments. Workflows owns delegated execution. Factory does not schedule, spawn, retry or stop threads itself.
+Factory persists draft and active living specifications, versioned requirements, proposed team plans, optional behavioral scenarios, links to actual project tests, immutable check evidence, native assignment associations, agent reviews, notes, review findings and explicit human judgments. Workflows owns delegated execution. Factory does not schedule, spawn, retry or stop threads itself.
 
 Direct work needs a task and final verification; no delegated worker is required. Several implementation, research or review assignments can use the same eligible Team profile. The profile is validated against the target host model catalog, and the preference revision and explicit task override are retained. Same native environment work is serialized by Workflows. Ownership text remains advisory rather than filesystem confinement.
 
 ## Agent, SDK and CLI
 
-The `bb_factory` tool accepts `{action, input}`. Actions are `create`, `update`, `status`, `list`, `verify`, `assign`, `cancel`, `finding`, and `resolve`. Input follows the corresponding RPC schema in [src/shared.ts](src/shared.ts). Human judgment is deliberately absent from the agent tool.
+The `bb_factory` tool accepts `{action, input}`. Actions are `create`, `update`, `start`, `status`, `list`, `verify`, `assign`, `cancel`, `finding`, `resolve`, `review`, and `note`. Input follows the corresponding RPC schema in [src/shared.ts](src/shared.ts). Human judgment is deliberately absent from the agent tool.
 
 SDK consumers use `sdk.plugins.callRpc({pluginId: "factory-team", method, input, outputSchema})` with `factoryRpcContract`. Delegation uses the public Workflows experimental execution RPC; Team preferences use the existing `factory-team` RPC. Factory and Workflows must be enabled for delegation. Direct task verification does not require Workflows.
 
-The CLI exposes the same records through `bb factory <action> --input '<JSON>'`, plus `judge` for an explicitly authorized human attestation. `judge` requires `humanConfirmed:true`, actor, requirement ID, accepted boolean, rationale, expectedVersion and expectedFingerprint from the displayed task. Changed content or specification rejects the attestation rather than silently applying it to a new result. These are user attestations, not cryptographic provenance: an API credential holder can submit one. Agents must never invent human authorization.
+The CLI exposes the same records through `bb factory <action> --input '<JSON>'`, plus `judge` and `judge-many` for explicitly authorized human attestations. `judge-many` accepts one or more human requirement IDs and validates the whole batch before writing it atomically. Both commands require `humanConfirmed:true`, actor, accepted boolean, expectedVersion and expectedFingerprint from the displayed task. Rejections require rationale; an accepted batch with empty rationale stores `Accepted reviewed requirements`. Changed content or specification rejects the attestation rather than silently applying it to a new result. These are user attestations, not cryptographic provenance: an API credential holder can submit one. Agents must never invent human authorization.
 
 ```sh
 bb factory create --input '{"threadId":"THREAD","spec":{"goal":"Prevent duplicate bookings","scope":"booking service","requirements":[{"id":"R1","text":"Two requests for the last place yield exactly one booking","criterion":"automated"}],"scenarios":[],"checks":[{"id":"race","requirementIds":["R1"],"testRef":"tests/booking.test.ts#concurrent","argv":["pnpm","test","tests/booking.test.ts"],"timeoutMs":60000,"required":true}]}}'
+bb factory start --input '{"taskId":"TASK","expectedVersion":1}'
 bb factory verify --input '{"taskId":"TASK"}'
 bb factory status --input '{"taskId":"TASK"}'
 bb factory cancel --input '{"taskId":"TASK","archive":false}'
@@ -23,7 +24,11 @@ bb factory cancel --input '{"taskId":"TASK","archive":false}'
 
 Each native launch request is validated and stored immutably before dispatch, in the same transaction as its task associations. Retrying the same launch replays that exact request through Workflows’ idempotent start operation, including the original specification context; changing the task later never rewrites a pending request. A changed assignment requires a new launch identity. Unknown RPC outcomes keep ownership uncertain until the native owner reports confirmed settlement.
 
-A spec update requires expectedVersion and a changeReason. Prior specifications and check definitions remain immutable. A passing command without a linked required check does not cover a requirement. `testRef` must name an existing file inside the project; check quality and requirement mapping still require review.
+A new task is a draft. Drafts can be revised without starting work and cannot be assigned, verified, reviewed, judged or accepted. `start` activates the current expected version without spawning workers. A spec update requires expectedVersion and a changeReason and never starts the task. Prior specifications and check definitions remain immutable. A passing command without a linked required check does not cover a requirement. `testRef` must name an existing file inside the project; check quality and requirement mapping still require review.
+
+Specifications can include `problem`, `outcome` and an advisory `teamPlan`. Each team-plan item names a role, eligible profile, requirement IDs and rationale. It proposes ownership for discussion; actual work is represented separately by native assignment records.
+
+An `agent` criterion is accepted only by a current review bound to the current spec version and content fingerprint. Reviews require a reviewer, nonempty summary, at least one artifact reference and only agent requirement IDs. A later current rejection supersedes an older pass. Agent reviews never satisfy human criteria. Notes are immutable note, decision, blocker or conclusion artifacts and retain the current spec version plus a content fingerprint when capture is available.
 
 ## Evidence and freshness
 

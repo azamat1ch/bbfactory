@@ -27,7 +27,10 @@ type NativeSnapshot = z.infer<
 function launchArtifactId(taskId: string, launchId: string) {
   return `factory-launch:${JSON.stringify([taskId, launchId])}`;
 }
-export function createFactoryService(bb: BbPluginApi, initializeStorage = true) {
+export function createFactoryService(
+  bb: BbPluginApi,
+  initializeStorage = true,
+) {
   const db = bb.storage.database();
   if (initializeStorage) bb.storage.migrate(db, migrations);
   const store = createStore(db);
@@ -186,6 +189,8 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
       task.status = status;
       task.statusDetail = text;
     };
+    if (task.phase === "draft")
+      return fail("unverified", "Draft task must be started before acceptance");
     if (task.stopRequested || task.archived)
       return fail("unverified", "Stop requested; acceptance is suspended");
     if (store.verifying(task.id))
@@ -242,6 +247,23 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
             (j) => j.requirementId === requirement.id,
           );
         }
+      } else if (requirement.criterion === "agent") {
+        const review = detail.reviews
+          .filter(
+            (review) =>
+              review.requirementIds.includes(requirement.id) &&
+              review.specVersion === task.specVersion &&
+              review.fingerprint === state.fingerprint,
+          )
+          .at(-1);
+        if (review && !review.accepted)
+          return fail("failed", `Agent review rejected ${requirement.id}`);
+        if (!review) {
+          missing = true;
+          stale ||= detail.reviews.some((review) =>
+            review.requirementIds.includes(requirement.id),
+          );
+        }
       } else if (
         !task.checks.some(
           (c) =>
@@ -277,8 +299,65 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
     save(detail);
     return detail;
   }
+  async function recordHumanJudgments(
+    input: Input<"factoryRecordJudgments">,
+    detail: FactoryTaskDetail,
+  ) {
+    if (
+      detail.task.phase !== "active" ||
+      detail.task.stopRequested ||
+      detail.task.archived
+    )
+      throw new Error("Human judgment requires an active task");
+    if (new Set(input.requirementIds).size !== input.requirementIds.length)
+      throw new Error("Requirement IDs must be unique");
+    if (
+      input.requirementIds.some(
+        (id) =>
+          !detail.task.requirements.some(
+            (requirement) =>
+              requirement.id === id && requirement.criterion === "human",
+          ),
+      )
+    )
+      throw new Error("All selected requirements must be human criteria");
+    if (!input.accepted && !input.rationale.trim())
+      throw new Error("Rejected human judgments require rationale");
+    const state = await content(detail.task.environmentId);
+    if (!state.complete) throw new Error("Cannot judge unknown content");
+    if (
+      input.expectedVersion !== detail.task.specVersion ||
+      input.expectedFingerprint !== state.fingerprint
+    )
+      throw new Error(
+        "The specification or content changed since review; reload before judging",
+      );
+    const now = Date.now();
+    const rationale =
+      input.rationale.trim() || "Accepted reviewed requirements";
+    const judgments = input.requirementIds.map((requirementId) => ({
+      id: randomUUID(),
+      taskId: input.taskId,
+      requirementId,
+      specVersion: detail.task.specVersion,
+      fingerprint: state.fingerprint,
+      accepted: input.accepted,
+      actor: input.actor,
+      rationale,
+      createdAt: now,
+    }));
+    detail.judgments.push(...judgments);
+    evaluate(detail, state);
+    db.transaction(() => {
+      for (const judgment of judgments)
+        store.artifact(judgment.id, input.taskId, "human-judgment", judgment);
+      save(detail);
+    })();
+    return detail;
+  }
   const service = {
     async createTask(input: Input<"factoryCreateTask">) {
+      input = factoryRpcContract.factoryCreateTask.input.parse(input);
       const thread = await bb.sdk.threads.get({ threadId: input.threadId });
       if (!thread.environmentId || thread.archivedAt || thread.deletedAt)
         throw new Error("An active thread environment is required");
@@ -292,6 +371,7 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
           originThreadId: thread.id,
           environmentId: thread.environmentId,
           ...input.spec,
+          phase: "draft",
           specVersion: 1,
           status: "unverified",
           statusDetail: "No acceptance evidence",
@@ -304,6 +384,8 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
         evidence: [],
         findings: [],
         judgments: [],
+        reviews: [],
+        notes: [],
         specs: [
           {
             version: 1,
@@ -338,6 +420,7 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
       );
     },
     updateTask(input: Input<"factoryUpdateTask">) {
+      input = factoryRpcContract.factoryUpdateTask.input.parse(input);
       return locked(input.taskId, async () => {
         const detail = store.get(input.taskId);
         if (detail.task.specVersion !== input.expectedVersion)
@@ -354,9 +437,11 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
         detail.specs.push(spec);
         Object.assign(detail.task, input.spec, {
           specVersion: version,
-          status: "stale",
+          status: detail.task.phase === "draft" ? "unverified" : "stale",
           statusDetail:
-            "Specification changed; independent checks must run again",
+            detail.task.phase === "draft"
+              ? "Draft specification changed"
+              : "Specification changed; independent checks must run again",
         });
         db.transaction(() => {
           store.artifact(
@@ -370,9 +455,26 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
         return detail;
       });
     },
+    startTask(input: Input<"factoryStartTask">) {
+      input = factoryRpcContract.factoryStartTask.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        if (detail.task.specVersion !== input.expectedVersion)
+          throw new Error("Specification changed; reload before starting");
+        if (detail.task.stopRequested || detail.task.archived)
+          throw new Error("Stopped or archived tasks cannot be started");
+        if (detail.task.phase === "active") return detail;
+        detail.task.phase = "active";
+        evaluate(detail, await content(detail.task.environmentId));
+        save(detail);
+        return detail;
+      });
+    },
     verifyTask(taskId: string) {
       return locked(taskId, async () => {
         const detail = store.get(taskId);
+        if (detail.task.phase !== "active")
+          throw new Error("Verification requires an active task");
         await native(detail, detail.task.stopRequested);
         if (
           detail.task.stopRequested ||
@@ -394,6 +496,7 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
         if (!before.complete) {
           evaluate(detail, before);
           save(detail);
+          store.finishVerification(taskId);
           checks.delete(taskId);
           return detail;
         }
@@ -463,6 +566,8 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
       return locked("assignments", () =>
         locked(input.taskId, async () => {
           const detail = store.get(input.taskId);
+          if (detail.task.phase !== "active")
+            throw new Error("Assignment requires an active task");
           if (detail.task.stopRequested || detail.task.archived)
             throw new Error("Task has durable stop intent");
           if (
@@ -683,42 +788,95 @@ export function createFactoryService(bb: BbPluginApi, initializeStorage = true) 
       });
     },
     judge(input: Input<"factoryRecordJudgment">) {
+      input = factoryRpcContract.factoryRecordJudgment.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        return recordHumanJudgments(
+          factoryRpcContract.factoryRecordJudgments.input.parse({
+            taskId: input.taskId,
+            requirementIds: [input.requirementId],
+            accepted: input.accepted,
+            actor: input.actor,
+            rationale: input.rationale,
+            humanConfirmed: input.humanConfirmed,
+            expectedVersion: input.expectedVersion,
+            expectedFingerprint: input.expectedFingerprint,
+          }),
+          detail,
+        );
+      });
+    },
+    judgeMany(input: Input<"factoryRecordJudgments">) {
+      input = factoryRpcContract.factoryRecordJudgments.input.parse(input);
+      return locked(input.taskId, async () =>
+        recordHumanJudgments(input, store.get(input.taskId)),
+      );
+    },
+    review(input: Input<"factoryRecordAgentReview">) {
+      input = factoryRpcContract.factoryRecordAgentReview.input.parse(input);
       return locked(input.taskId, async () => {
         const detail = store.get(input.taskId);
         if (
-          !detail.task.requirements.some(
-            (r) => r.id === input.requirementId && r.criterion === "human",
+          detail.task.phase !== "active" ||
+          detail.task.stopRequested ||
+          detail.task.archived
+        )
+          throw new Error("Agent review requires an active task");
+        if (new Set(input.requirementIds).size !== input.requirementIds.length)
+          throw new Error("Requirement IDs must be unique");
+        if (
+          input.requirementIds.some(
+            (id) =>
+              !detail.task.requirements.some(
+                (requirement) =>
+                  requirement.id === id && requirement.criterion === "agent",
+              ),
           )
         )
-          throw new Error("Explicit human criterion required");
+          throw new Error("All selected requirements must be agent criteria");
         const state = await content(detail.task.environmentId);
-        if (!state.complete) throw new Error("Cannot judge unknown content");
-        const {
-          humanConfirmed,
-          expectedVersion,
-          expectedFingerprint,
-          ...attestation
-        } = input;
+        if (!state.complete) throw new Error("Cannot review unknown content");
+        const { expectedVersion, expectedFingerprint, ...record } = input;
         if (
           expectedVersion !== detail.task.specVersion ||
           expectedFingerprint !== state.fingerprint
         )
           throw new Error(
-            "The specification or content changed since review; reload before judging",
+            "The specification or content changed since review; reload before recording",
           );
-        if (!humanConfirmed)
-          throw new Error("Explicit human confirmation required");
-        const judgment = {
-          ...attestation,
+        const review = {
+          ...record,
           id: randomUUID(),
           specVersion: detail.task.specVersion,
           fingerprint: state.fingerprint,
           createdAt: Date.now(),
         };
-        detail.judgments.push(judgment);
-        store.artifact(judgment.id, input.taskId, "human-judgment", judgment);
+        detail.reviews.push(review);
         evaluate(detail, state);
-        save(detail);
+        db.transaction(() => {
+          store.artifact(review.id, input.taskId, "agent-review", review);
+          save(detail);
+        })();
+        return detail;
+      });
+    },
+    note(input: Input<"factoryRecordNote">) {
+      input = factoryRpcContract.factoryRecordNote.input.parse(input);
+      return locked(input.taskId, async () => {
+        const detail = store.get(input.taskId);
+        const state = await content(detail.task.environmentId);
+        const note = {
+          ...input,
+          id: randomUUID(),
+          specVersion: detail.task.specVersion,
+          fingerprint: state.complete ? state.fingerprint : null,
+          createdAt: Date.now(),
+        };
+        detail.notes.push(note);
+        db.transaction(() => {
+          store.artifact(note.id, input.taskId, "note", note);
+          save(detail);
+        })();
         return detail;
       });
     },

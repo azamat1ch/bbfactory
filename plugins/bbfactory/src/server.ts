@@ -3,7 +3,10 @@ import { z } from "zod";
 import { createFactoryService } from "./service.js";
 import { factoryRpcContract } from "./shared.js";
 
-export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) {
+export function registerFactoryTasks(
+  bb: BbPluginApi,
+  initializeStorage = true,
+) {
   const service = createFactoryService(bb, initializeStorage);
   const handlers = {
     factoryListTasks: async (
@@ -14,6 +17,7 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
     ) => service.getTaskDetail(input.taskId),
     factoryCreateTask: service.createTask,
     factoryUpdateTask: service.updateTask,
+    factoryStartTask: service.startTask,
     factoryVerifyTask: (
       input: z.infer<typeof factoryRpcContract.factoryVerifyTask.input>,
     ) => service.verifyTask(input.taskId),
@@ -22,10 +26,14 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
     factoryRecordFinding: service.finding,
     factoryResolveFinding: service.resolve,
     factoryRecordJudgment: service.judge,
+    factoryRecordJudgments: service.judgeMany,
+    factoryRecordAgentReview: service.review,
+    factoryRecordNote: service.note,
   };
   bb.rpc.register(factoryRpcContract, handlers, {
     experimental_discoverable: true,
-    experimental_description: "Versioned Factory tasks, native assignments and requirement-linked acceptance evidence.",
+    experimental_description:
+      "Versioned Factory tasks, native assignments and requirement-linked acceptance evidence.",
   });
   const actions = {
     create: (input: unknown) =>
@@ -35,6 +43,10 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
     update: (input: unknown) =>
       handlers.factoryUpdateTask(
         factoryRpcContract.factoryUpdateTask.input.parse(input),
+      ),
+    start: (input: unknown) =>
+      handlers.factoryStartTask(
+        factoryRpcContract.factoryStartTask.input.parse(input),
       ),
     status: (input: unknown) =>
       handlers.factoryGetTask(
@@ -64,6 +76,14 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
       handlers.factoryResolveFinding(
         factoryRpcContract.factoryResolveFinding.input.parse(input),
       ),
+    review: (input: unknown) =>
+      handlers.factoryRecordAgentReview(
+        factoryRpcContract.factoryRecordAgentReview.input.parse(input),
+      ),
+    note: (input: unknown) =>
+      handlers.factoryRecordNote(
+        factoryRpcContract.factoryRecordNote.input.parse(input),
+      ),
   };
   bb.agents.registerTool({
     name: "bb_factory",
@@ -77,6 +97,10 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
       z.strictObject({
         action: z.literal("update"),
         input: factoryRpcContract.factoryUpdateTask.input,
+      }),
+      z.strictObject({
+        action: z.literal("start"),
+        input: factoryRpcContract.factoryStartTask.input,
       }),
       z.strictObject({
         action: z.literal("status"),
@@ -106,6 +130,14 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
         action: z.literal("resolve"),
         input: factoryRpcContract.factoryResolveFinding.input,
       }),
+      z.strictObject({
+        action: z.literal("review"),
+        input: factoryRpcContract.factoryRecordAgentReview.input,
+      }),
+      z.strictObject({
+        action: z.literal("note"),
+        input: factoryRpcContract.factoryRecordNote.input,
+      }),
     ]),
     async execute(input) {
       return JSON.stringify(await actions[input.action](input.input));
@@ -117,6 +149,10 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
       handlers.factoryRecordJudgment(
         factoryRpcContract.factoryRecordJudgment.input.parse(input),
       ),
+    "judge-many": (input: unknown) =>
+      handlers.factoryRecordJudgments(
+        factoryRpcContract.factoryRecordJudgments.input.parse(input),
+      ),
   };
   bb.cli.register(
     defineCli({
@@ -127,7 +163,7 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
           name,
           cliCommand({
             summary:
-              name === "judge"
+              name === "judge" || name === "judge-many"
                 ? "Record explicitly authorized human judgment (requires humanConfirmed:true)"
                 : `${name} Factory task`,
             options: {
@@ -179,7 +215,8 @@ export function registerFactoryTasks(bb: BbPluginApi, initializeStorage = true) 
       }
     },
   });
-  bb.agents.contributeInstructions(() =>
+  bb.agents.contributeInstructions(
+    () =>
       "Factory owns requirements and acceptance evidence. Work directly or assign ordinary native workers through bb_factory. Requirement-linked checks run on final content. Human judgments require explicit human authorization, never a worker's assertion.",
   );
 }

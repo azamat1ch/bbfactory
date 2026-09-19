@@ -142,6 +142,8 @@ it("carries two selected assignments through real Workflows and only accepts che
     const { task } = await service.createTask({
       threadId: "origin",
       spec: {
+        problem: "Independent changes need integration",
+        outcome: "Both changes pass together",
         goal: "Implement two independent changes",
         scope: "src",
         requirements: [
@@ -149,6 +151,8 @@ it("carries two selected assignments through real Workflows and only accepts che
             id: "R1",
             text: "Integrated changes pass regression",
             criterion: "automated",
+            reviewInstructions: "",
+            artifactRefs: [],
           },
         ],
         scenarios: [],
@@ -162,8 +166,10 @@ it("carries two selected assignments through real Workflows and only accepts che
             required: true,
           },
         ],
+        teamPlan: [],
       },
     });
+    await service.startTask({ taskId: task.id, expectedVersion: 1 });
     const assignments = ["a", "b"].map((id) => ({
       id,
       role: "implement" as const,
