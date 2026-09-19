@@ -1,4 +1,7 @@
-import { UrlLink } from "@get-bb/plugin-sdk/app";
+import {
+  experimental_FileLink as FileLink,
+  UrlLink,
+} from "@get-bb/plugin-sdk/app";
 import type { FactoryTaskDetail, FactoryTaskView } from "./shared.js";
 import { safeUrl } from "./app-status.js";
 
@@ -36,7 +39,13 @@ export function Status({ value }: { value: StatusValue }) {
   );
 }
 
-export function ArtifactLink({ value }: { value: string }) {
+export function ArtifactLink({
+  value,
+  environmentId,
+}: {
+  value: string;
+  environmentId: string;
+}) {
   const href = safeUrl(value);
   if (href)
     return (
@@ -44,16 +53,39 @@ export function ArtifactLink({ value }: { value: string }) {
         {value}
       </UrlLink>
     );
+  if (
+    !value.startsWith("/") &&
+    !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
+    (value.includes("/") || /\.[a-z0-9]+$/i.test(value))
+  )
+    return (
+      <FileLink
+        target={{
+          kind: "workspace",
+          environmentId,
+          path: value.replace(/^\.\//, ""),
+        }}
+        className="factory-artifact"
+      >
+        {value}
+      </FileLink>
+    );
   return <span className="factory-mono factory-artifact">{value}</span>;
 }
 
-export function ArtifactList({ refs }: { refs: string[] }) {
+export function ArtifactList({
+  refs,
+  environmentId,
+}: {
+  refs: string[];
+  environmentId: string;
+}) {
   if (!refs.length) return null;
   return (
     <ul className="factory-artifacts">
       {refs.map((ref) => (
         <li key={ref}>
-          <ArtifactLink value={ref} />
+          <ArtifactLink value={ref} environmentId={environmentId} />
         </li>
       ))}
     </ul>

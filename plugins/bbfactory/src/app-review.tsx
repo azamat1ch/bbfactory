@@ -115,7 +115,10 @@ export function HumanReviewPanel({
                       {requirement.reviewInstructions}
                     </p>
                   )}
-                  <ArtifactList refs={requirement.artifactRefs} />
+                  <ArtifactList
+                    refs={requirement.artifactRefs}
+                    environmentId={detail.task.environmentId}
+                  />
                   {latest && !latest.accepted && (
                     <p className="factory-meta">
                       Last request: {latest.rationale}
@@ -165,9 +168,7 @@ export function HumanReviewPanel({
       {done.length > 0 && (
         <details className="factory-review-done">
           <summary>
-            <span className="factory-meta">
-              Accepted ({done.length})
-            </span>
+            <span className="factory-meta">Accepted ({done.length})</span>
           </summary>
           <ul className="factory-review-list">
             {done.map((requirement) => {

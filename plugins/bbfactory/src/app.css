@@ -598,13 +598,21 @@
   margin: 0.25rem 0;
 }
 :where(.factory-note-conclusion) {
-  border-left-color: color-mix(in oklab, var(--success, var(--ink)) 55%, transparent);
+  border-left-color: color-mix(
+    in oklab,
+    var(--success, var(--ink)) 55%,
+    transparent
+  );
 }
 :where(.factory-note-blocker) {
   border-left-color: color-mix(in oklab, var(--destructive) 55%, transparent);
 }
 :where(.factory-note-decision) {
-  border-left-color: color-mix(in oklab, var(--accent, var(--ink)) 55%, transparent);
+  border-left-color: color-mix(
+    in oklab,
+    var(--accent, var(--ink)) 55%,
+    transparent
+  );
 }
 :where(
   .factory-panel input:focus-visible,

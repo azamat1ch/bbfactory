@@ -327,7 +327,9 @@ describe("Factory task evidence", () => {
             .getByRole("button", { name: "Stopping…" })
             .hasAttribute("disabled"),
         ).toBe(true);
-        expect(slot.queryByText("Accepted")).toBeNull();
+        expect(
+          slot.queryByText("Accepted", { selector: ".factory-status" }),
+        ).toBeNull();
       }
       await act(async () =>
         finishStop({
@@ -341,7 +343,9 @@ describe("Factory task evidence", () => {
         }),
       );
       await slot.findByText("Verification stopped.");
-      expect(slot.queryByText("Accepted")).toBeNull();
+      expect(
+        slot.queryByText("Accepted", { selector: ".factory-status" }),
+      ).toBeNull();
       if (completionOrder === "after") {
         await act(async () =>
           finishVerify({
@@ -354,7 +358,9 @@ describe("Factory task evidence", () => {
           }),
         );
       }
-      expect(slot.queryByText("Accepted")).toBeNull();
+      expect(
+        slot.queryByText("Accepted", { selector: ".factory-status" }),
+      ).toBeNull();
       expect(slot.queryByText("All checks passed.")).toBeNull();
       expect(slot.getByText("Verification stopped.")).toBeTruthy();
       expect(slot.queryByRole("button", { name: "Run checks" })).toBeNull();
@@ -367,8 +373,12 @@ describe("Factory task evidence", () => {
     await slot.findByRole("heading", {
       name: "Keep the final place exclusive",
     });
-    expect(slot.getByText("Stale")).toBeTruthy();
-    expect(slot.queryByText("Accepted")).toBeNull();
+    expect(
+      slot.getByText("Stale", { selector: ".factory-status" }),
+    ).toBeTruthy();
+    expect(
+      slot.queryByText("Accepted", { selector: ".factory-status" }),
+    ).toBeNull();
     expect(
       slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
     ).toBeTruthy();
@@ -412,7 +422,9 @@ describe("Factory task evidence", () => {
     expect(
       slot.getByText("0 accepted · 0 failed · 1 stale · 4 unverified"),
     ).toBeTruthy();
-    expect(slot.queryByText("Accepted")).toBeNull();
+    expect(
+      slot.queryByText("Accepted", { selector: ".factory-status" }),
+    ).toBeNull();
   });
 
   it("marks a passing current check accepted without any human form", async () => {
@@ -442,9 +454,41 @@ describe("Factory task evidence", () => {
     const judge = vi.fn(async () => detail);
     const slot = mount(detail, { factoryRecordJudgments: judge });
     await slot.findByRole("heading", { name: detail.task.goal });
-    expect(slot.getByText("Check the waitlist copy on mobile.")).toBeTruthy();
-    expect(slot.getByText("https://example.com/waitlist.png")).toBeTruthy();
-    expect(slot.getByText("docs/waitlist.md")).toBeTruthy();
+    expect(slot.getByLabelText("Acceptance by method").textContent).toBe(
+      "Check 0/2 · Agent 0/1 · Human 0/2 accepted",
+    );
+    fireEvent.click(
+      within(slot.container.querySelector(".factory-review")!).getByRole(
+        "link",
+        { name: "docs/waitlist.md" },
+      ),
+    );
+    expect(slot.navigateCalls).toContainEqual({
+      method: "experimental_openFilePreview",
+      options: {
+        target: {
+          kind: "workspace",
+          environmentId: "env-1",
+          path: "docs/waitlist.md",
+        },
+        location: null,
+      },
+    });
+    expect(
+      within(slot.container.querySelector(".factory-review")!).getByText(
+        "Check the waitlist copy on mobile.",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(slot.container.querySelector(".factory-review")!).getByText(
+        "https://example.com/waitlist.png",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(slot.container.querySelector(".factory-review")!).getByText(
+        "docs/waitlist.md",
+      ),
+    ).toBeTruthy();
     expect(slot.queryByRole("checkbox", { name: /personally/i })).toBeNull();
     const accept = slot.getByRole("button", { name: "Accept selected" });
     expect(accept.hasAttribute("disabled")).toBe(true);
@@ -454,9 +498,7 @@ describe("Factory task evidence", () => {
     fireEvent.click(
       slot.getByRole("checkbox", { name: /Confirmation email states/i }),
     );
-    fireEvent.click(
-      slot.getByRole("button", { name: "Accept 2 selected" }),
-    );
+    fireEvent.click(slot.getByRole("button", { name: "Accept 2 selected" }));
     await waitFor(() =>
       expect(judge).toHaveBeenCalledWith({
         taskId: "task-1",
@@ -532,15 +574,84 @@ describe("Factory task evidence", () => {
     const detail = fixture();
     const slot = mount(detail);
     await slot.findByRole("heading", { name: detail.task.goal });
-    fireEvent.click(
-      slot.getByRole("button", { name: "Request agent review" }),
-    );
+    fireEvent.click(slot.getByRole("button", { name: "Request agent review" }));
     expect(slot.composer.quotes[0]).toContain("task-1");
     expect(slot.composer.quotes[0]).toContain("spec v2");
     expect(slot.composer.quotes[0]).toContain("AGENT-1");
     expect(slot.composer.quotes[0]).not.toContain("BOOK-1");
     expect(slot.composer.text).toContain("Keep this draft");
     expect(slot.composer.submits).toEqual([]);
+  });
+
+  it("does not restore a prior human selection when content changes and then returns", async () => {
+    let detail = fixture();
+    const slot = mount(detail, { factoryGetTask: () => detail });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    fireEvent.click(
+      slot.getByRole("checkbox", { name: /waitlist message is clear/i }),
+    );
+    expect(
+      slot
+        .getByRole("button", { name: "Accept 1 selected" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    detail = {
+      ...detail,
+      task: { ...detail.task, statusDetail: "Result B" },
+      observedContent: {
+        ...detail.observedContent!,
+        fingerprint: "changed-content",
+      },
+    };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("Result B");
+    expect(
+      slot
+        .getByRole("button", { name: "Accept selected" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    detail = {
+      ...detail,
+      task: { ...detail.task, statusDetail: "Result A restored" },
+      observedContent: {
+        ...detail.observedContent!,
+        fingerprint: "current-content-sha",
+      },
+    };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("Result A restored");
+    expect(
+      slot
+        .getByRole("button", { name: "Accept selected" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("preserves expanded requirements across pages and live updates", async () => {
+    let detail = bulkFixture(100);
+    const slot = mount(detail, { factoryGetTask: () => detail });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    const row = slot.container.querySelector<HTMLDetailsElement>(
+      ".factory-requirement",
+    )!;
+    fireEvent.click(row.querySelector("summary")!);
+    await waitFor(() => expect(row.open).toBe(true));
+    fireEvent.click(slot.getByRole("button", { name: /Next/ }));
+    fireEvent.click(slot.getByRole("button", { name: /Previous/ }));
+    expect(
+      slot.container.querySelector<HTMLDetailsElement>(".factory-requirement")!
+        .open,
+    ).toBe(true);
+    detail = {
+      ...detail,
+      task: { ...detail.task, statusDetail: "Progress refreshed" },
+    };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("Progress refreshed");
+    expect(
+      slot.container.querySelector<HTMLDetailsElement>(".factory-requirement")!
+        .open,
+    ).toBe(true);
   });
 
   it("shows the draft stage with its environment and Start, without review or verify forms", async () => {
@@ -688,9 +799,7 @@ describe("Factory task evidence", () => {
       "Host disconnected; no checks ran",
     );
     expect(
-      slot
-        .getByRole("button", { name: "Run checks" })
-        .hasAttribute("disabled"),
+      slot.getByRole("button", { name: "Run checks" }).hasAttribute("disabled"),
     ).toBe(false);
   });
 
@@ -837,13 +946,17 @@ describe("Factory task evidence", () => {
     );
     await slot.findByText("Accepted");
     await slot.setRealtimeConnectionState("reconnecting");
-    expect(slot.queryByText("Accepted")).toBeNull();
+    expect(
+      slot.queryByText("Accepted", { selector: ".factory-status" }),
+    ).toBeNull();
     expect(slot.getByText("Status unavailable")).toBeTruthy();
     await slot.setRealtimeConnectionState("connected");
     expect((await slot.findByRole("alert")).textContent).toContain(
       "Refresh failed",
     );
-    expect(slot.queryByText("Accepted")).toBeNull();
+    expect(
+      slot.queryByText("Accepted", { selector: ".factory-status" }),
+    ).toBeNull();
     fireEvent.click(slot.getByRole("button", { name: "Retry" }));
     await slot.findByText("Accepted");
   });

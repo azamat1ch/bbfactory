@@ -109,9 +109,7 @@ function TeamPlan({ detail }: { detail: FactoryTaskDetail }) {
       <summary>
         <h3>Proposed team</h3>
         <span className="factory-meta">
-          {plan.length
-            ? `${plan.length} proposed`
-            : "None proposed"}
+          {plan.length ? `${plan.length} proposed` : "None proposed"}
         </span>
       </summary>
       {plan.length === 0 ? (
@@ -129,8 +127,7 @@ function TeamPlan({ detail }: { detail: FactoryTaskDetail }) {
                     {item.title}
                     <span className="factory-meta factory-block">
                       {item.role} · {item.profile.providerId}/
-                      {item.profile.model} ·{" "}
-                      {item.requirementIds.length}{" "}
+                      {item.profile.model} · {item.requirementIds.length}{" "}
                       {item.requirementIds.length === 1
                         ? "requirement"
                         : "requirements"}
@@ -145,8 +142,7 @@ function TeamPlan({ detail }: { detail: FactoryTaskDetail }) {
                     <dt>Profile</dt>
                     <dd>
                       {item.profile.providerId} · {item.profile.model} ·{" "}
-                      {item.profile.reasoningLevel} ·{" "}
-                      {item.profile.serviceTier}
+                      {item.profile.reasoningLevel} · {item.profile.serviceTier}
                     </dd>
                     <dt>Requirements</dt>
                     <dd>{item.requirementIds.join(" · ") || "None"}</dd>
@@ -198,7 +194,10 @@ function Notes({ detail }: { detail: FactoryTaskDetail }) {
                 </span>
               </div>
               <p className="factory-note">{note.text}</p>
-              <ArtifactList refs={note.artifactRefs} />
+              <ArtifactList
+                refs={note.artifactRefs}
+                environmentId={detail.task.environmentId}
+              />
             </li>
           ))}
         </ul>
@@ -339,13 +338,13 @@ export function TaskDetail({
     : error
       ? "Action failed. Run checks to refresh current acceptance."
       : [
-            task.statusDetail,
-            active && fingerprint === null
-              ? "Current result content is not fully captured; recorded statuses may not apply to the current result."
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
+          task.statusDetail,
+          active && fingerprint === null
+            ? "Current result content is not fully captured; recorded statuses may not apply to the current result."
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
   return (
     <div className="factory-detail">
       <div className="factory-detail-scroll">
@@ -392,21 +391,29 @@ export function TaskDetail({
         <details className="factory-section">
           <summary>
             <h3>Scope</h3>
-            <span className="factory-meta">{task.environmentId}</span>
+            <span className="factory-meta">Target workspace</span>
           </summary>
           <p className="factory-scope">{task.scope}</p>
+          <p className="factory-meta factory-mono">
+            {detail.observedContent?.canonicalPath ?? task.environmentId}
+          </p>
         </details>
         {draft && (
           <section className="factory-stage">
             <div className="factory-check-heading">
               <h3>Draft — not started</h3>
-              <Status value="draft" />
             </div>
             <p className="factory-note">
               Review the requirements and scope. Starting activates the task
               against its target environment; it does not launch workers.
             </p>
             <dl className="factory-properties">
+              <dt>Project</dt>
+              <dd>{task.projectId}</dd>
+              <dt>Workspace</dt>
+              <dd className="factory-mono">
+                {detail.observedContent?.canonicalPath ?? "Capture pending"}
+              </dd>
               <dt>Target environment</dt>
               <dd className="factory-mono">{task.environmentId}</dd>
             </dl>
@@ -414,7 +421,12 @@ export function TaskDetail({
               <Button
                 type="button"
                 size="sm"
-                disabled={busy !== null || unavailable || task.archived}
+                disabled={
+                  busy !== null ||
+                  unavailable ||
+                  task.archived ||
+                  task.stopRequested
+                }
                 onClick={() =>
                   void run("start", () =>
                     rpc.call("factoryStartTask", {
@@ -435,6 +447,7 @@ export function TaskDetail({
         </div>
         <RequirementNavigator detail={detail} />
         <HumanReviewPanel
+          key={`${task.specVersion}:${fingerprint ?? "unknown"}`}
           detail={detail}
           busy={busy !== null || unavailable}
           run={run}
@@ -535,7 +548,9 @@ export function TaskDetail({
                         <Icon name="ArrowUpRight" className="size-3" />
                       </Button>
                     ) : (
-                      <p className="factory-note">No native thread linked yet.</p>
+                      <p className="factory-note">
+                        No native thread linked yet.
+                      </p>
                     )}
                   </div>
                 </details>
@@ -566,22 +581,22 @@ export function TaskDetail({
             !task.stopRequested &&
             agentPending.length > 0 &&
             !task.archived && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                composer.addQuote(
-                  `Agent review requested for Factory task ${task.id} (spec v${task.specVersion}): ${agentPending
-                    .map((requirement) => requirement.id)
-                    .join(", ")}. Goal: ${task.goal}`,
-                );
-                setReviewDrafted(true);
-              }}
-            >
-              Request agent review
-            </Button>
-          )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  composer.addQuote(
+                    `Agent review requested for Factory task ${task.id} (spec v${task.specVersion}): ${agentPending
+                      .map((requirement) => requirement.id)
+                      .join(", ")}. Goal: ${task.goal}`,
+                  );
+                  setReviewDrafted(true);
+                }}
+              >
+                Request agent review
+              </Button>
+            )}
           <Button
             type="button"
             variant="outline"

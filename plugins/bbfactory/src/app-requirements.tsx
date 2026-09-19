@@ -99,7 +99,9 @@ function AgentReviews({
       {reviews.map((review) => (
         <div className="factory-review-record" key={review.id}>
           <div className="factory-check-heading">
-            <strong>{review.accepted ? "Accepted" : "Changes requested"}</strong>
+            <strong>
+              {review.accepted ? "Accepted" : "Changes requested"}
+            </strong>
             <span className="factory-meta">
               {review.reviewer} · v{review.specVersion} ·{" "}
               {time(review.createdAt)}
@@ -109,7 +111,10 @@ function AgentReviews({
           {review.limitations && (
             <p className="factory-meta">Limitations: {review.limitations}</p>
           )}
-          <ArtifactList refs={review.artifactRefs} />
+          <ArtifactList
+            refs={review.artifactRefs}
+            environmentId={detail.task.environmentId}
+          />
         </div>
       ))}
     </>
@@ -145,7 +150,13 @@ function HumanJudgments({
   );
 }
 
-function RequirementDetail({ row, detail }: { row: Row; detail: FactoryTaskDetail }) {
+function RequirementDetail({
+  row,
+  detail,
+}: {
+  row: Row;
+  detail: FactoryTaskDetail;
+}) {
   const { requirement } = row;
   const checks = detail.task.checks.filter((check) =>
     check.requirementIds.includes(requirement.id),
@@ -166,7 +177,10 @@ function RequirementDetail({ row, detail }: { row: Row; detail: FactoryTaskDetai
           <strong>Review:</strong> {requirement.reviewInstructions}
         </p>
       )}
-      <ArtifactList refs={requirement.artifactRefs} />
+      <ArtifactList
+        refs={requirement.artifactRefs}
+        environmentId={detail.task.environmentId}
+      />
       {scenarios.map((scenario) => (
         <dl className="factory-scenario" key={scenario.id}>
           <dt>Given</dt>
@@ -197,9 +211,7 @@ function RequirementDetail({ row, detail }: { row: Row; detail: FactoryTaskDetai
             <div className="factory-mono factory-test-ref">{check.testRef}</div>
             <code className="factory-command">{check.argv.join(" ")}</code>
             {evidence.length ? (
-              evidence.map((item) => (
-                <Evidence key={item.id} evidence={item} />
-              ))
+              evidence.map((item) => <Evidence key={item.id} evidence={item} />)
             ) : (
               <p className="factory-note">Not run · no evidence yet</p>
             )}
@@ -225,6 +237,7 @@ export function RequirementNavigator({
   const [method, setMethod] = useState<"all" | ReviewMethod>("all");
   const [status, setStatus] = useState<"all" | RequirementStatus>("all");
   const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => requirementRows(detail), [detail]);
   const counts = statusCounts(rows);
   const query = search.trim().toLowerCase();
@@ -258,6 +271,15 @@ export function RequirementNavigator({
       <p className="factory-meta factory-counts">
         {counts.accepted} accepted · {counts.failed} failed · {counts.stale}{" "}
         stale · {counts.unverified} unverified
+      </p>
+      <p className="factory-meta" aria-label="Acceptance by method">
+        {(["check", "agent", "human"] as const)
+          .map((method) => {
+            const group = rows.filter((row) => row.method === method);
+            return `${reviewMethodLabel(method)} ${group.filter((row) => row.status === "accepted").length}/${group.length}`;
+          })
+          .join(" · ")}{" "}
+        accepted
       </p>
       <div className="factory-filters">
         <input
@@ -306,7 +328,17 @@ export function RequirementNavigator({
           <details
             className="factory-requirement"
             key={row.requirement.id}
-            open={showStatus && row.status === "failed" ? true : undefined}
+            open={expanded.has(row.requirement.id)}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setExpanded((previous) => {
+                if (previous.has(row.requirement.id) === open) return previous;
+                const next = new Set(previous);
+                if (open) next.add(row.requirement.id);
+                else next.delete(row.requirement.id);
+                return next;
+              });
+            }}
           >
             <summary>
               <span className="factory-requirement-id">
@@ -327,33 +359,37 @@ export function RequirementNavigator({
           </p>
         )}
       </div>
-      {pageCount > 1 && (
+      {filtered.length > 0 && (
         <div className="factory-pagination">
           <span className="factory-meta">
             {current * PAGE_SIZE + 1}–
             {Math.min(filtered.length, (current + 1) * PAGE_SIZE)} of{" "}
             {filtered.length}
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={current === 0}
-            onClick={() => setPage(current - 1)}
-          >
-            <Icon name="ChevronLeft" className="size-3.5" />
-            Previous
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={current >= pageCount - 1}
-            onClick={() => setPage(current + 1)}
-          >
-            Next
-            <Icon name="ChevronRight" className="size-3.5" />
-          </Button>
+          {pageCount > 1 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+            >
+              <Icon name="ChevronLeft" className="size-3.5" />
+              Previous
+            </Button>
+          )}
+          {pageCount > 1 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={current >= pageCount - 1}
+              onClick={() => setPage(current + 1)}
+            >
+              Next
+              <Icon name="ChevronRight" className="size-3.5" />
+            </Button>
+          )}
         </div>
       )}
     </div>
