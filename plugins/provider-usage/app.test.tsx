@@ -426,30 +426,36 @@ it.each([
     "Sign in to this account in the source plugin’s settings.",
   ],
   ["no-limits", "No usage limits reported for this plan."],
+  ["unmeasured", "Not measured yet."],
+  ["unsupported", "Limits unavailable."],
   [
     "source-error",
     "Couldn’t refresh usage. Showing the last available update.",
   ],
 ] as const)("renders the %s shared-source state", async (state, expected) => {
   const usage: UsageProvider["usage"] =
-    state === "expired" || state === "unauthenticated"
-      ? { status: state }
-      : {
-          status: "ok",
-          accountEmail: "review@example.com",
-          planLabel: null,
-          windows:
-            state === "no-limits"
-              ? []
-              : [
-                  {
-                    label: "Weekly limit",
-                    usedPercent: 42,
-                    resetsAt: null,
-                    cost: null,
-                  },
-                ],
-        };
+    state === "unmeasured"
+      ? null
+      : state === "expired" ||
+          state === "unauthenticated" ||
+          state === "unsupported"
+        ? { status: state }
+        : {
+            status: "ok",
+            accountEmail: "review@example.com",
+            planLabel: null,
+            windows:
+              state === "no-limits"
+                ? []
+                : [
+                    {
+                      label: "Weekly limit",
+                      usedPercent: 42,
+                      resetsAt: null,
+                      cost: null,
+                    },
+                  ],
+          };
   const account: UsageProvider = {
     id: "account",
     providerId: "codex",

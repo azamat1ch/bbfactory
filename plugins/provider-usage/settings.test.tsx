@@ -222,13 +222,19 @@ it("keeps authentication and plans without limits distinct from loading and erro
     planLabel: null,
     windows: [],
   };
+  const fourth = account("pending");
+  fourth.usage = null;
+  const fifth = account("no-source");
+  fifth.usage = { status: "unsupported" };
   const slot = renderSlot(
     app.settingsSections[0]!,
     {},
     {
       rpc: {
         getUsage: () => ({
-          machines: [machine("source:pool", [first, second, third])],
+          machines: [
+            machine("source:pool", [first, second, third, fourth, fifth]),
+          ],
         }),
       },
     },
@@ -238,5 +244,7 @@ it("keeps authentication and plans without limits distinct from loading and erro
   expect(
     slot.getByText("No usage limits reported for this plan."),
   ).toBeTruthy();
+  expect(slot.getByText("Not measured yet.")).toBeTruthy();
+  expect(slot.getByText("Limits unavailable.")).toBeTruthy();
   expect(slot.queryByText("0% used")).toBeNull();
 });

@@ -325,7 +325,7 @@ function ProviderUsageBody({
   if (!usage) {
     return (
       <p className="text-xs text-muted-foreground">
-        {isLoading ? "Loading usage…" : "Usage not provided."}
+        {isLoading ? "Loading usage…" : "Not measured yet."}
       </p>
     );
   }
@@ -358,6 +358,10 @@ function ProviderUsageBody({
     case "expired":
       return (
         <p className="text-xs text-muted-foreground">{config.expiredHint}</p>
+      );
+    case "unsupported":
+      return (
+        <p className="text-xs text-muted-foreground">Limits unavailable.</p>
       );
     case "error":
       return <p className="text-xs text-muted-foreground">{usage.message}</p>;

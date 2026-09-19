@@ -23,6 +23,7 @@ export const providerUsageSchema = z.discriminatedUnion("status", [
   z.strictObject({ status: z.literal("not_installed") }),
   z.strictObject({ status: z.literal("unauthenticated") }),
   z.strictObject({ status: z.literal("expired") }),
+  z.strictObject({ status: z.literal("unsupported") }),
   z.strictObject({
     status: z.literal("error"),
     message: nonemptyStringSchema,

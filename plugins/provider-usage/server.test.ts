@@ -218,7 +218,17 @@ it("lists cheaply, fetches only the selected source/provider, preserves failed m
     enabled = false;
     expect(
       await host.harness.behavior.callRpc("getUsage", request),
-    ).toMatchObject({ machines: [{ id: "host", providers: [] }] });
+    ).toMatchObject({
+      machines: [
+        {
+          id: "host",
+          providers: [
+            { providerId: "codex", usage: { status: "unsupported" } },
+            { providerId: "claude-code", usage: { status: "unsupported" } },
+          ],
+        },
+      ],
+    });
   } finally {
     await host.harness.lifecycle.dispose();
   }
@@ -261,6 +271,138 @@ it("keeps an unconfigured shared group without hosts or measurement requests", a
       ],
     });
     expect(rpc).toHaveBeenCalledTimes(1);
+  } finally {
+    await host.harness.lifecycle.dispose();
+  }
+});
+
+it("lists registered providers without a usage source as unsupported, without fetching or duplicating covered rows", async () => {
+  const rpc = vi.fn(async ({ method }) => {
+    if (method === usageListMethod)
+      return {
+        resources: [
+          {
+            id: "host",
+            providerId: "codex",
+            label: "Codex",
+            scope: { kind: "host", hostId: "host", hostName: "Machine" },
+          },
+        ],
+      };
+    return {
+      observedAt: 456,
+      usage: {
+        status: "ok",
+        accountEmail: "codex@example.com",
+        planLabel: null,
+        windows: [
+          {
+            id: "week",
+            label: "Weekly",
+            usedPercent: 10,
+            resetsAt: null,
+            model: null,
+            cost: null,
+          },
+        ],
+      },
+    };
+  });
+  const host = createFakePluginHost({
+    pluginId: "provider-usage",
+    sdk: {
+      system: { config: async () => ({ primaryHostId: null }) },
+      hosts: {
+        list: async () => [
+          makeHostResponse({
+            id: "host",
+            name: "Machine",
+            status: "connected",
+          }),
+          makeHostResponse({
+            id: "offline",
+            name: "Laptop",
+            status: "disconnected",
+          }),
+          makeHostResponse({
+            id: "failing",
+            name: "Failing",
+            status: "connected",
+          }),
+        ],
+      },
+      providers: {
+        list: async (args?: { hostId?: string }) => {
+          if (args?.hostId === "failing")
+            throw new Error("provider listing failed");
+          if (args?.hostId === "offline")
+            return [{ id: "acp-devin", displayName: "Devin", logoUrl: null }];
+          return [
+            { id: "codex", displayName: "Codex", logoUrl: "/codex.svg" },
+            { id: "acp-opencode", displayName: "opencode", logoUrl: null },
+            { id: "acp-devin", displayName: "Devin", logoUrl: null },
+          ];
+        },
+      },
+      plugins: {
+        experimental_discoverRpc: async () => [
+          { pluginId: "local", displayName: "Codex", method: usageListMethod },
+        ],
+        callRpc: rpc,
+      },
+    },
+  });
+  plugin(host.bb);
+  try {
+    const snapshot = await host.harness.behavior.callRpc("getUsage", {
+      force: false,
+      machineIds: null,
+      providerId: null,
+      maxAgeMs: 0,
+    });
+    expect(snapshot).toMatchObject({
+      machines: [
+        {
+          id: "host",
+          providers: [
+            { providerId: "codex", usage: null },
+            { providerId: "acp-opencode", usage: { status: "unsupported" } },
+            { providerId: "acp-devin", usage: { status: "unsupported" } },
+          ],
+        },
+        {
+          id: "offline",
+          providers: [
+            { providerId: "acp-devin", usage: { status: "unsupported" } },
+          ],
+        },
+        { id: "failing", providers: [] },
+      ],
+    });
+    expect(host.harness.sdk.callsTo("providers.list")).toEqual(
+      expect.arrayContaining([[{ hostId: "host" }], [{ hostId: "offline" }]]),
+    );
+    expect(
+      rpc.mock.calls.every(([args]) => args.method === usageListMethod),
+    ).toBe(true);
+    await host.harness.behavior.callRpc("getUsage", {
+      force: false,
+      machineIds: ["host"],
+      providerId: "acp-devin",
+      maxAgeMs: 0,
+    });
+    expect(
+      rpc.mock.calls.every(([args]) => args.method === usageListMethod),
+    ).toBe(true);
+    await host.harness.behavior.callRpc("getUsage", {
+      force: false,
+      machineIds: ["host"],
+      providerId: "codex",
+      maxAgeMs: 0,
+    });
+    expect(
+      rpc.mock.calls.filter(([args]) => args.method === usageFetchMethod),
+    ).toHaveLength(1);
   } finally {
     await host.harness.lifecycle.dispose();
   }

@@ -200,7 +200,7 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
   };
   const readUsage = async (request: UsageRequest): Promise<UsageSnapshot> => {
     const hostId = request.machineIds?.find((id) => !id.startsWith("source:"));
-    const [hosts, sources, providers, config] = await Promise.all([
+    const [hosts, sources, metadataProviders, config] = await Promise.all([
       bb.sdk.hosts
         .list()
         .then((hosts) => hosts.filter((host) => host.type !== "ephemeral")),
@@ -214,6 +214,25 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         .catch(() => []),
       bb.sdk.system.config().catch(() => null),
     ]);
+    const hostProviders = new Map<string, Provider[]>();
+    await Promise.all(
+      hosts.map(async (host) => {
+        hostProviders.set(
+          host.id,
+          await bb.sdk.providers.list({ hostId: host.id }).catch(() => []),
+        );
+      }),
+    );
+    const providers: Provider[] = [];
+    const providerSeen = new Set<string>();
+    for (const provider of [
+      ...hosts.flatMap((host) => hostProviders.get(host.id) ?? []),
+      ...metadataProviders,
+    ]) {
+      if (providerSeen.has(provider.id)) continue;
+      providerSeen.add(provider.id);
+      providers.push(provider);
+    }
     hosts.sort(
       (a, b) =>
         Number(b.id === config?.primaryHostId) -
@@ -358,6 +377,20 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         );
         if (source.error !== null || failures.has(key))
           machine.error = "Some usage could not be refreshed.";
+      }
+      if (!machine.id.startsWith("source:")) {
+        const covered = new Set(
+          candidates
+            .filter((candidate) => candidate.machineId === machine.id)
+            .map((candidate) => candidate.resource.providerId),
+        );
+        for (const provider of hostProviders.get(machine.id) ?? []) {
+          if (covered.has(provider.id)) continue;
+          machine.providers.push({
+            ...normalizedProvider(provider, undefined),
+            usage: { status: "unsupported" },
+          });
+        }
       }
     }
     const providerOrder = new Map(
