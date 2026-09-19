@@ -15,7 +15,10 @@
       "icon": "ChartColumn"
     },
     "server": "./server.ts",
-    "app": "./app.tsx"
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
   },
   "keywords": [
     "bb-plugin"

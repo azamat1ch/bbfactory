@@ -497,3 +497,172 @@ it("collapses known account observations per machine, preserves unknown identiti
     await harness.lifecycle.dispose();
   }
 });
+
+it("exposes bounded all-provider limits, preserves freshness and unknowns, and skips disabled or disconnected providers", async () => {
+  let failing = false;
+  let active = 0;
+  let peak = 0;
+  const resources = ["codex", "claude-code", "devin", "cursor", "disabled"].map(
+    (providerId) => ({
+      id: providerId,
+      providerId,
+      label: providerId,
+      scope: { kind: "shared" },
+    }),
+  );
+  const rpc = vi.fn(async ({ method, input }) => {
+    if (method === usageListMethod)
+      return {
+        label: "Pool",
+        resources: [
+          ...resources,
+          {
+            id: "offline",
+            providerId: "codex",
+            label: "Offline",
+            scope: { kind: "host", hostId: "offline", hostName: "Offline" },
+          },
+        ],
+      };
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    active--;
+    if (failing) throw new Error("refresh failed");
+    return {
+      accountKey: null,
+      observedAt: 123,
+      usage:
+        input.resourceId === "devin"
+          ? { status: "unauthenticated", accountEmail: null, planLabel: null }
+          : {
+              status: "ok",
+              accountEmail: null,
+              planLabel: null,
+              windows: [
+                {
+                  id: "week",
+                  label: "Weekly",
+                  usedPercent: 0,
+                  resetsAt: null,
+                  model: null,
+                  cost: null,
+                },
+              ],
+            },
+    };
+  });
+  const host = createFakePluginHost({
+    pluginId: "provider-usage",
+    sdk: {
+      system: { config: async () => ({ primaryHostId: null }) },
+      hosts: {
+        list: async () => [
+          makeHostResponse({ id: "offline", status: "disconnected" }),
+        ],
+      },
+      providers: {
+        list: async () =>
+          ["codex", "claude-code", "devin", "cursor", "unsupported"].map(
+            (id) => ({
+              id,
+              displayName: id,
+              logoUrl: null,
+            }),
+          ),
+      },
+      plugins: {
+        experimental_discoverRpc: async () => [
+          { pluginId: "pool", displayName: "Pool", method: usageListMethod },
+        ],
+        callRpc: rpc,
+      },
+    },
+  });
+  plugin(host.bb);
+  const request = { force: false, machineIds: null, maxAgeMs: 60_000 };
+  try {
+    const first = await host.harness.behavior.callRpc("readLimits", request);
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(
+      rpc.mock.calls
+        .filter(([args]) => args.method === usageFetchMethod)
+        .map(([args]) => args.input.resourceId),
+    ).toEqual(["codex", "claude-code", "devin", "cursor"]);
+    expect(first).toMatchObject({
+      snapshot: {
+        machines: [
+          {
+            id: "offline",
+            providers: expect.arrayContaining([
+              expect.objectContaining({
+                providerId: "unsupported",
+                usage: { status: "unsupported" },
+              }),
+            ]),
+          },
+          {
+            id: "source:pool",
+            providers: expect.arrayContaining([
+              expect.objectContaining({
+                providerId: "codex",
+                usage: expect.objectContaining({
+                  windows: [expect.objectContaining({ usedPercent: 0 })],
+                }),
+              }),
+              expect.objectContaining({
+                providerId: "devin",
+                usage: { status: "unauthenticated" },
+              }),
+              expect.objectContaining({ providerId: "disabled", usage: null }),
+            ]),
+          },
+        ],
+      },
+      observations: expect.arrayContaining([
+        expect.objectContaining({
+          resourceId: "pool:codex",
+          observedAt: 123,
+          fetchedAt: expect.any(Number),
+          refreshFailed: false,
+        }),
+      ]),
+    });
+    await host.harness.callAgentTool("bb_usage_limits", {});
+    expect(
+      rpc.mock.calls.filter(([args]) => args.method === usageFetchMethod),
+    ).toHaveLength(4);
+    const cli = await host.harness.runCli(["limits", "--json"]);
+    expect(cli.exitCode).toBe(0);
+    expect(JSON.parse(cli.stdout)).toEqual(first);
+    expect(
+      host.harness.registrations.experimental_publishedRpcMethods.map(
+        (method) => method.method,
+      ),
+    ).toContain("readLimits");
+    failing = true;
+    const stale = await host.harness.behavior.callRpc("readLimits", {
+      ...request,
+      force: true,
+    });
+    expect(stale).toMatchObject({
+      observations: expect.arrayContaining([
+        expect.objectContaining({
+          resourceId: "pool:codex",
+          observedAt: 123,
+          fetchedAt: expect.any(Number),
+          refreshFailed: true,
+        }),
+      ]),
+    });
+    const scoped = await host.harness.behavior.callRpc("readLimits", {
+      ...request,
+      machineIds: ["source:pool"],
+    });
+    expect(scoped).toMatchObject({
+      snapshot: { machines: [expect.objectContaining({ id: "source:pool" })] },
+    });
+  } finally {
+    await host.harness.dispose();
+  }
+});

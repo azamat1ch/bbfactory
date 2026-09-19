@@ -2,8 +2,13 @@ import {
   normalizeUsageMeasurement,
   selectUsageResources,
 } from "./usage-normalization.js";
-import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod/mini";
+import {
+  cliCommand,
+  defineCli,
+  defineRpcContract,
+  type BbPluginApi,
+} from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import {
   usageSnapshotSchema,
   type ProviderUsage,
@@ -31,7 +36,26 @@ interface SourceResult {
 const TINT_COLOR_PATTERN =
   /^(#[0-9a-f]{3,8}|(rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\([-+.%\w\s,/]*\)|[a-z]{3,20})$/iu;
 
+const limitsInputSchema = z.strictObject({
+  force: z.boolean(),
+  machineIds: z.nullable(z.array(z.string().check(z.minLength(1)))),
+  maxAgeMs: z.number().int().nonnegative().max(300_000),
+});
+const limitsSnapshotSchema = z.strictObject({
+  snapshot: usageSnapshotSchema,
+  observations: z.array(
+    z.strictObject({
+      machineId: z.string(),
+      resourceId: z.string(),
+      observedAt: z.nullable(z.number()),
+      fetchedAt: z.nullable(z.number()),
+      refreshFailed: z.boolean(),
+    }),
+  ),
+});
+
 export const providerUsageRpcContract = defineRpcContract({
+  readLimits: { input: limitsInputSchema, output: limitsSnapshotSchema },
   getUsage: {
     input: z.strictObject({
       force: z.boolean(),
@@ -157,7 +181,7 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
   const inventories = new Map<string, SourceResult>();
   const measurements = new Map<
     string,
-    { value: UsageMeasurement; loadedAt: number }
+    { value: UsageMeasurement; loadedAt: number; fetchedAt: number }
   >();
   const failures = new Set<string>();
   const pending = new Map<
@@ -190,7 +214,8 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
         const value = normalizeUsageMeasurement(raw);
         if (value.usage.status === "error")
           throw new Error("Usage could not be refreshed.");
-        measurements.set(key, { value, loadedAt: Date.now() });
+        const fetchedAt = Date.now();
+        measurements.set(key, { value, loadedAt: fetchedAt, fetchedAt });
         failures.delete(key);
         return value;
       })
@@ -198,7 +223,10 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
     pending.set(key, { force, promise });
     return promise;
   };
-  const readUsage = async (request: UsageRequest): Promise<UsageSnapshot> => {
+  const readUsage = async (
+    request: UsageRequest,
+    allProviders = false,
+  ): Promise<UsageSnapshot> => {
     const hostId = request.machineIds?.find((id) => !id.startsWith("source:"));
     const [hosts, sources, metadataProviders, config] = await Promise.all([
       bb.sdk.hosts
@@ -288,8 +316,14 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
               ? `source:${source.pluginId}`
               : resource.scope.hostId;
           return (
-            request.providerId !== null &&
-            resource.providerId === request.providerId &&
+            (allProviders
+              ? resource.scope.kind === "shared"
+                ? providerSeen.has(resource.providerId)
+                : (hostProviders.get(resource.scope.hostId) ?? []).some(
+                    (provider) => provider.id === resource.providerId,
+                  )
+              : request.providerId !== null &&
+                resource.providerId === request.providerId) &&
             (request.machineIds === null ||
               request.machineIds.includes(machineId)) &&
             (resource.scope.kind === "shared" ||
@@ -404,7 +438,93 @@ export default function providerUsagePlugin(bb: BbPluginApi): void {
       );
     return { machines };
   };
-  bb.rpc.register(providerUsageRpcContract, { getUsage: readUsage });
+  const readLimits = async (input: z.infer<typeof limitsInputSchema>) => {
+    const snapshot = await readUsage({ ...input, providerId: null }, true);
+    if (input.machineIds !== null)
+      snapshot.machines = snapshot.machines.filter((machine) =>
+        input.machineIds!.includes(machine.id),
+      );
+    const observations = snapshot.machines.flatMap((machine) =>
+      machine.providers.map((provider) => {
+        const source = [...inventories.values()].find((source) =>
+          source.resources.some(
+            (resource) => `${source.pluginId}:${resource.id}` === provider.id,
+          ),
+        );
+        const resource = source?.resources.find(
+          (resource) => `${source.pluginId}:${resource.id}` === provider.id,
+        );
+        const key =
+          source && resource ? keyOf(source.pluginId, resource.id) : null;
+        const cached = key === null ? undefined : measurements.get(key);
+        return {
+          machineId: machine.id,
+          resourceId: provider.id,
+          observedAt: cached?.value.observedAt ?? null,
+          fetchedAt: cached?.fetchedAt ?? null,
+          refreshFailed:
+            source?.error != null || (key !== null && failures.has(key)),
+        };
+      }),
+    );
+    return { snapshot, observations };
+  };
+  bb.rpc.register(
+    providerUsageRpcContract,
+    { getUsage: (request) => readUsage(request), readLimits },
+    {
+      experimental_discoverable: true,
+      experimental_description:
+        "Read subscription limits across enabled sources, shared accounts and machines. readLimits refreshes all eligible providers; getUsage retains lazy selected-provider behavior.",
+    },
+  );
+  bb.agents.registerTool({
+    name: "bb_usage_limits",
+    description:
+      "Read subscription usage and reset windows across enabled providers and pooled accounts. Unknown, unsupported and stale measurements are not zero or unlimited capacity. Machines are separate locations; never sum duplicate account quotas across locations.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    async execute() {
+      return JSON.stringify(
+        await readLimits({ force: false, machineIds: null, maxAgeMs: 60_000 }),
+      );
+    },
+  });
+  bb.cli.register(
+    defineCli({
+      name: "usage",
+      summary:
+        "Inspect subscription usage across providers and pooled accounts",
+      commands: {
+        limits: cliCommand({
+          summary:
+            "Read all enabled provider limits, reset times and measurement freshness",
+          options: {
+            force: {
+              type: "boolean",
+              description:
+                "Request fresh measurements instead of accepting recent cache",
+            },
+            json: { type: "boolean", description: "Emit JSON" },
+          },
+          async run(input) {
+            const result = await readLimits({
+              force: input.options.force ?? false,
+              machineIds: null,
+              maxAgeMs: 60_000,
+            });
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify(
+                result,
+                null,
+                input.options.json ? undefined : 2,
+              ),
+            };
+          },
+        }),
+      },
+    }),
+  );
   const markDirty = () => {
     for (const value of measurements.values()) value.loadedAt = 0;
   };
