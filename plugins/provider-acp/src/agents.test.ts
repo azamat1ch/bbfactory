@@ -315,8 +315,54 @@ describe("acpProviderDeclaration", () => {
       "max",
     ]);
     expect(cursor.experimental_visibility).toBeUndefined();
+    expect(cursor.capabilities.supportsServiceTier).toBe(true);
+    expect(cursor.serviceTiers?.map((tier) => tier.id)).toEqual([
+      "default",
+      "fast",
+    ]);
     expect(cursor.maintenance?.usage).toBe(true);
     expect(cursor.maintenance?.installation).toBe(true);
+  });
+
+  it("declares the devin agent the bridge can launch", () => {
+    const agent = KNOWN_ACP_AGENTS.find((known) => known.id === "acp-devin");
+    if (agent === undefined) throw new Error("expected acp-devin to ship");
+
+    const declaration = acpProviderDeclaration(agent);
+    expect(declaration.experimental_visibility).toBe("installed");
+    expect(declaration.capabilities.fork).toBe("none");
+    expect(declaration.capabilities.supportsManualCompaction).toBe(false);
+    expect(declaration.capabilities.supportsServiceTier).toBe(false);
+    expect(declaration.serviceTiers).toBeUndefined();
+    expect(declaration.maintenance?.usage).toBe(false);
+    expect(declaration.maintenance?.installation).toBe(false);
+    expect(declaration.experimental_resolvesNativeRoots).toBe(true);
+    expect(declaration.strings?.signInHint).toContain("devin auth login");
+    expect(
+      declaration.experimental_bridgeOptions?.acpDialect,
+    ).toBeUndefined();
+
+    const launch = experimental_acpLaunchSpecSchema.parse(
+      declaration.experimental_bridgeOptions?.acpLaunchSpec,
+    );
+    expect(launch.command).toBe("devin");
+    expect(launch.args).toEqual(["acp"]);
+    expect(launch.permissionCli).toBeUndefined();
+    expect(declaration.experimental_nativeSkillRoots).toEqual({
+      user: [
+        { path: ".agents/skills" },
+        { path: ".claude/skills" },
+        { path: ".cursor/skills" },
+      ],
+      project: [
+        { path: ".devin/skills", ancestors: true },
+        { path: ".cognition/skills", ancestors: true },
+        { path: ".agents/skills", ancestors: true },
+        { path: ".windsurf/skills", ancestors: true },
+        { path: ".cursor/skills", ancestors: true },
+        { path: ".claude/skills", ancestors: true },
+      ],
+    });
   });
 
   it("gives a configured agent honest copy when it names no sign-in command", () => {

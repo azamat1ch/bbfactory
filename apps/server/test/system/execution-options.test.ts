@@ -41,6 +41,7 @@ const INSTALLED_ONLY_PROVIDER_IDS = [
   "acp-omp",
   "acp-grok",
   "acp-hermes-agent",
+  "acp-devin",
 ] as const;
 
 function registerInstalledOnlyProviderFixtures(harness: TestAppHarness): void {
@@ -370,7 +371,7 @@ describe("resolveSystemExecutionOptions", () => {
         responder.requests.filter(
           (request) => request.command.type === "provider.health",
         ),
-      ).toHaveLength(4);
+      ).toHaveLength(5);
       const modelRequest = responder.requests.find(
         (request) => request.command.type === "provider.list_models",
       );
@@ -750,7 +751,7 @@ describe("resolveSystemExecutionOptions", () => {
             responder.requests.filter(
               (request) => request.command.type === "provider.health",
             ),
-          ).toHaveLength(failStatusRequest ? 0 : 4);
+          ).toHaveLength(failStatusRequest ? 0 : 5);
           expect(
             responder.requests.filter(
               (request) => request.command.type === "provider.list_models",
@@ -1259,7 +1260,7 @@ describe("resolveSystemExecutionOptions", () => {
           responder.requests.filter(
             (request) => request.command.type === "provider.health",
           ),
-        ).toHaveLength(4);
+        ).toHaveLength(5);
         const modelRequest = responder.requests.find(
           (request) => request.command.type === "provider.list_models",
         );
@@ -1383,7 +1384,7 @@ describe("resolveSystemExecutionOptions", () => {
         responder.requests.filter(
           (request) => request.command.type === "provider.health",
         ),
-      ).toHaveLength(4);
+      ).toHaveLength(5);
       const modelRequest = responder.requests.find(
         (request) => request.command.type === "provider.list_models",
       );

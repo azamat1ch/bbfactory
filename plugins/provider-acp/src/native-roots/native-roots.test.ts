@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { experimental_nativeRootsResolveOutputSchema } from "@get-bb/plugin-sdk/host";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resolveDevinNativeRoots } from "./devin.js";
 import { resolveGrokNativeRoots } from "./grok.js";
 import { resolveHermesNativeRoots } from "./hermes.js";
 import { resolveOmpNativeRoots } from "./omp.js";
@@ -236,6 +237,37 @@ describe("omp", () => {
       shape: "skills",
     });
     expect(roots.some((root) => root.path.includes("commands"))).toBe(false);
+  });
+});
+
+describe("devin", () => {
+  it("lists the XDG devin and cognition skill trees", async () => {
+    const roots = await resolveSkills(resolveDevinNativeRoots, argsFor());
+    expect(roots).toEqual([
+      {
+        path: home(".config", "devin", "skills"),
+        origin: "user",
+        recursive: false,
+        shape: "skills",
+      },
+      {
+        path: home(".config", "cognition", "skills"),
+        origin: "user",
+        recursive: false,
+        shape: "skills",
+      },
+    ]);
+  });
+
+  it("follows XDG_CONFIG_HOME for the devin and cognition trees", async () => {
+    const roots = await resolveSkills(
+      resolveDevinNativeRoots,
+      argsFor({ XDG_CONFIG_HOME: path.join(tempRoot, "xdg") }),
+    );
+    expect(roots.map((root) => root.path)).toEqual([
+      path.join(tempRoot, "xdg", "devin", "skills"),
+      path.join(tempRoot, "xdg", "cognition", "skills"),
+    ]);
   });
 });
 
