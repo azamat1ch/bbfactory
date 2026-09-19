@@ -712,3 +712,15 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+:where(.factory-target-details) {
+  margin-bottom: 0.5rem;
+}
+:where(.factory-target-details > summary) {
+  cursor: pointer;
+}
+:where(.factory-target-details .factory-properties) {
+  margin-top: 0.5rem;
+}
+:where(.factory-current-coverage) {
+  margin-bottom: 0.625rem;
+}

@@ -679,7 +679,14 @@ describe("Factory task evidence", () => {
     }));
     const slot = mount(detail, { factoryStartTask: start });
     await slot.findByRole("heading", { name: detail.task.goal });
-    expect(slot.getByText("Draft — not started")).toBeTruthy();
+    expect(
+      slot.getByText("Draft", { selector: ".factory-status" }),
+    ).toBeTruthy();
+    expect(
+      slot.container
+        .querySelector(".factory-target-details")!
+        .hasAttribute("open"),
+    ).toBe(false);
     expect(slot.getByText("Target environment")).toBeTruthy();
     expect(slot.getAllByText("env-1").length).toBeGreaterThan(0);
     expect(slot.queryByRole("button", { name: "Run checks" })).toBeNull();
@@ -775,39 +782,20 @@ describe("Factory task evidence", () => {
     expect(slot.getByText(/No requirements match/)).toBeTruthy();
   });
 
-  it("preserves failed actions and only resolves a required finding with evidence", async () => {
+  it("discusses findings in chat without a mandatory form and preserves failed actions", async () => {
     const detail = fixture();
-    const resolve = vi.fn(async () => ({
-      ...detail,
-      findings: [
-        {
-          ...detail.findings[0]!,
-          resolution: "Locked the row; concurrent request test passes.",
-        },
-      ],
-    }));
     const verify = vi.fn(async () => {
       throw new Error("Host disconnected; no checks ran");
     });
-    const slot = mount(detail, {
-      factoryResolveFinding: resolve,
-      factoryVerifyTask: verify,
-    });
+    const slot = mount(detail, { factoryVerifyTask: verify });
     await slot.findByRole("heading", { name: detail.task.goal });
-    const resolveButton = slot.getByRole("button", { name: "Resolve finding" });
-    expect(resolveButton.hasAttribute("disabled")).toBe(true);
-    fireEvent.change(slot.getByLabelText("Resolution evidence"), {
-      target: { value: "Locked the row; concurrent request test passes." },
-    });
-    fireEvent.click(resolveButton);
-    await waitFor(() =>
-      expect(resolve).toHaveBeenCalledWith({
-        taskId: "task-1",
-        findingId: "review-1",
-        resolution: "Locked the row; concurrent request test passes.",
-      }),
-    );
-    await slot.findByText("Resolved");
+    expect(slot.queryByLabelText("Resolution evidence")).toBeNull();
+    expect(slot.container.querySelector("textarea")).toBeNull();
+    fireEvent.click(slot.getByRole("button", { name: "Discuss in chat" }));
+    expect(slot.composer.quotes[0]).toContain("review-1");
+    expect(slot.composer.quotes[0]).toContain("task-1");
+    expect(slot.composer.text).toContain("Keep this draft");
+    expect(slot.composer.submits).toEqual([]);
     fireEvent.click(slot.getByRole("button", { name: "Run checks" }));
     expect((await slot.findByRole("alert")).textContent).toContain(
       "Host disconnected; no checks ran",
@@ -930,7 +918,17 @@ describe("Factory task evidence", () => {
     ];
     const slot = mount(detail, { factoryGetTask: () => detail });
     await slot.findByRole("heading", { name: detail.task.goal });
-    expect(slot.getByText("Delivered")).toBeTruthy();
+    expect(
+      within(slot.container.querySelector(".factory-detail-header")!).getByText(
+        "Delivered",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(
+        slot.container.querySelector(".factory-detail-header")!,
+      ).queryByText("Stale"),
+    ).toBeNull();
+    expect(slot.getByText("Current coverage")).toBeTruthy();
     openSummary(slot, "Historical snapshots (1)");
     expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
     expect(
@@ -942,7 +940,17 @@ describe("Factory task evidence", () => {
     };
     await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
     await slot.findByText("Spec v3");
-    expect(slot.getByText("Delivered")).toBeTruthy();
+    expect(
+      within(slot.container.querySelector(".factory-detail-header")!).getByText(
+        "Delivered",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(
+        slot.container.querySelector(".factory-detail-header")!,
+      ).queryByText("Stale"),
+    ).toBeNull();
+    expect(slot.getByText("Current coverage")).toBeTruthy();
     expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
     expect(
       slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),

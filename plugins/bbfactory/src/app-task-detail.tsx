@@ -25,15 +25,13 @@ function FindingRow({
   finding,
   taskId,
   busy,
-  run,
 }: {
   finding: Finding;
   taskId: string;
   busy: boolean;
-  run: RunAction;
 }) {
-  const rpc = useRpc<typeof factoryRpcContract>();
-  const [resolution, setResolution] = useState("");
+  const composer = useComposer();
+  const [drafted, setDrafted] = useState(false);
   return (
     <details
       className="factory-finding"
@@ -64,38 +62,28 @@ function FindingRow({
             {finding.resolution}
           </p>
         ) : (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (resolution.trim())
-                void run("resolve", () =>
-                  rpc.call("factoryResolveFinding", {
-                    taskId,
-                    findingId: finding.id,
-                    resolution: resolution.trim(),
-                  }),
-                );
-            }}
-          >
-            <label className="factory-field">
-              Resolution evidence
-              <textarea
-                rows={2}
-                value={resolution}
-                disabled={busy}
-                onChange={(event) => setResolution(event.target.value)}
-                placeholder="What changed, and what verifies the fix?"
-              />
-            </label>
+          <>
             <Button
-              type="submit"
+              type="button"
               variant="outline"
               size="sm"
-              disabled={busy || !resolution.trim()}
+              disabled={busy}
+              onClick={() => {
+                composer.addQuote(
+                  `Discuss or resolve finding ${finding.id} for Factory task ${taskId}: ${finding.evidence}`,
+                );
+                setDrafted(true);
+              }}
             >
-              Resolve finding
+              Discuss in chat
             </Button>
-          </form>
+            {drafted && (
+              <p className="factory-meta" role="status">
+                Finding added to chat. Describe the resolution or feedback and
+                send.
+              </p>
+            )}
+          </>
         )}
       </div>
     </details>
@@ -307,16 +295,16 @@ export function TaskDetail({
             Spec v{task.specVersion}
             {task.archived ? " · Archived" : ""}
           </span>
-          {unavailable || error ? null : busy === "verify" ||
+          {detail.deliveries.length > 0 ? (
+            <span className="factory-status">Delivered</span>
+          ) : unavailable || error ? null : busy === "verify" ||
             busy === "stop" ? (
             <span className="factory-meta">
               {busy === "stop" ? "Stopping…" : "Running checks…"}
             </span>
           ) : draft ? (
             <Status value="draft" />
-          ) : (
-            <Status value={task.status} />
-          )}
+          ) : null}
         </header>
         <h2>{task.goal}</h2>
         {detail.deliveries.length > 0 && (
@@ -324,7 +312,6 @@ export function TaskDetail({
             className="factory-delivery"
             aria-label="Historical delivery"
           >
-            <strong>Delivered</strong>
             <details>
               <summary>
                 Historical snapshots ({detail.deliveries.length})
@@ -345,12 +332,8 @@ export function TaskDetail({
                 </div>
               ))}
             </details>
-            <p className="factory-meta">
-              Current workspace coverage is shown below.
-            </p>
           </section>
         )}
-        {statusLine && <p className="factory-status-detail">{statusLine}</p>}
         {error && <ErrorNotice text={error} />}
         {task.stopRequested && (
           <p className="factory-note">
@@ -379,23 +362,19 @@ export function TaskDetail({
         </section>
         {draft && (
           <section className="factory-stage">
-            <div className="factory-check-heading">
-              <h3>Draft — not started</h3>
-            </div>
-            <p className="factory-note">
-              Review the requirements and scope. Starting activates the task
-              against its target environment; it does not launch workers.
-            </p>
-            <dl className="factory-properties">
-              <dt>Project</dt>
-              <dd>{task.projectId}</dd>
-              <dt>Workspace</dt>
-              <dd className="factory-mono">
-                {detail.observedContent?.canonicalPath ?? "Capture pending"}
-              </dd>
-              <dt>Target environment</dt>
-              <dd className="factory-mono">{task.environmentId}</dd>
-            </dl>
+            <details className="factory-target-details">
+              <summary>Target workspace</summary>
+              <dl className="factory-properties">
+                <dt>Project</dt>
+                <dd>{task.projectId}</dd>
+                <dt>Workspace</dt>
+                <dd className="factory-mono">
+                  {detail.observedContent?.canonicalPath ?? "Capture pending"}
+                </dd>
+                <dt>Target environment</dt>
+                <dd className="factory-mono">{task.environmentId}</dd>
+              </dl>
+            </details>
             <div className="factory-actions">
               <Button
                 type="button"
@@ -424,6 +403,17 @@ export function TaskDetail({
           <h3>Requirements</h3>
           <span className="factory-meta">{task.requirements.length}</span>
         </div>
+        {active && (
+          <div className="factory-current-coverage">
+            <div className="factory-check-heading">
+              <span className="factory-meta">Current coverage</span>
+              {!unavailable && !error && <Status value={task.status} />}
+            </div>
+            {statusLine && (
+              <p className="factory-status-detail">{statusLine}</p>
+            )}
+          </div>
+        )}
         <RequirementNavigator
           detail={detail}
           selected={selected}
@@ -455,7 +445,6 @@ export function TaskDetail({
                   finding={finding}
                   taskId={task.id}
                   busy={busy !== null || unavailable || task.archived}
-                  run={run}
                 />
               ))}
               {!detail.findings.length && (
