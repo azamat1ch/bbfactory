@@ -126,6 +126,7 @@ export function createFactoryService(bb: BbPluginApi) {
     }
   }
   function evaluate(detail: FactoryTaskDetail, state: FactoryContent) {
+    detail.observedContent = state;
     const task = detail.task;
     const fail = (status: typeof task.status, text: string) => {
       task.status = status;
@@ -205,10 +206,7 @@ export function createFactoryService(bb: BbPluginApi) {
           ? "Evidence does not match current content or specification"
           : "Required behavior lacks passing linked evidence or explicit human judgment",
       );
-    fail(
-      "accepted",
-      "All required checks and decisions match this version.",
-    );
+    fail("accepted", "All required checks and decisions match this version.");
   }
   async function refresh(
     taskId: string,
@@ -233,6 +231,7 @@ export function createFactoryService(bb: BbPluginApi) {
       const now = Date.now();
       const taskId = `bft_${randomUUID()}`;
       const detail: FactoryTaskDetail = {
+        observedContent: null,
         task: {
           id: taskId,
           projectId: thread.projectId,
@@ -524,13 +523,7 @@ export function createFactoryService(bb: BbPluginApi) {
             )
               throw new Error("Unsupported service tier");
             const others = [
-              ...store
-                .all()
-                .flatMap((d) =>
-                  d.assignments.filter(
-                    (a) => !["succeeded", "failed"].includes(a.nativeStatus),
-                  ),
-                ),
+              ...store.unresolvedAssociations(env.hostId, state.canonicalPath),
               ...additions,
             ];
             if (
@@ -674,7 +667,19 @@ export function createFactoryService(bb: BbPluginApi) {
           throw new Error("Explicit human criterion required");
         const state = await content(detail.task.environmentId);
         if (!state.complete) throw new Error("Cannot judge unknown content");
-        const { humanConfirmed, ...attestation } = input;
+        const {
+          humanConfirmed,
+          expectedVersion,
+          expectedFingerprint,
+          ...attestation
+        } = input;
+        if (
+          expectedVersion !== detail.task.specVersion ||
+          expectedFingerprint !== state.fingerprint
+        )
+          throw new Error(
+            "The specification or content changed since review; reload before judging",
+          );
         if (!humanConfirmed)
           throw new Error("Explicit human confirmation required");
         const judgment = {

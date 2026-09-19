@@ -393,10 +393,24 @@ describe("Factory acceptance against real SQLite migrations", () => {
           actor: "user",
           rationale: "Confirmed requested design",
           humanConfirmed: true,
+          expectedVersion: 1,
+          expectedFingerprint: "content-v1",
         })
       ).task.status,
     ).toBe("accepted");
     f.setFingerprint("redesign");
+    await expect(
+      f.service.judge({
+        taskId: task.id,
+        requirementId: "R1",
+        accepted: true,
+        actor: "user",
+        rationale: "Stale browser form",
+        humanConfirmed: true,
+        expectedVersion: 1,
+        expectedFingerprint: "content-v1",
+      }),
+    ).rejects.toThrow("changed since review");
     expect((await f.service.getTaskDetail(task.id)).task.status).toBe("stale");
   });
   it("persists stop before a blocked check returns and cannot overwrite it with green evidence", async () => {

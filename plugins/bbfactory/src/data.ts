@@ -1,5 +1,9 @@
 import type Database from "better-sqlite3";
-import { taskDetailSchema, type FactoryTaskDetail } from "./shared.js";
+import {
+  assignmentSchema,
+  taskDetailSchema,
+  type FactoryTaskDetail,
+} from "./shared.js";
 
 export const migrations = [
   `CREATE TABLE factory_tasks (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, value TEXT NOT NULL);
@@ -30,6 +34,15 @@ export function createStore(db: Database.Database) {
         .pluck()
         .all(threadId)
         .map((value) => taskDetailSchema.parse(JSON.parse(String(value))));
+    },
+    unresolvedAssociations(hostId: string, workspacePath: string) {
+      return db
+        .prepare(
+          "SELECT a.value FROM factory_tasks t, json_each(t.value, '$.assignments') a WHERE json_extract(a.value, '$.hostId') = ? AND json_extract(a.value, '$.workspacePath') = ? AND json_extract(a.value, '$.nativeStatus') NOT IN ('succeeded', 'failed')",
+        )
+        .pluck()
+        .all(hostId, workspacePath)
+        .map((value) => assignmentSchema.parse(JSON.parse(String(value))));
     },
     all(): FactoryTaskDetail[] {
       return db

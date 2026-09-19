@@ -154,6 +154,7 @@ export const taskViewSchema = z.strictObject({
   updatedAt: z.number(),
 });
 export const taskDetailSchema = z.strictObject({
+  observedContent: contentSchema.nullable().default(null),
   task: taskViewSchema,
   assignments: z.array(assignmentSchema),
   evidence: z.array(evidenceSchema),
@@ -230,6 +231,8 @@ export const factoryRpcContract = defineRpcContract({
       actor: z.string().min(1),
       rationale: z.string().min(1),
       humanConfirmed: z.literal(true),
+      expectedVersion: z.number().int().positive(),
+      expectedFingerprint: id,
     }),
     output: taskDetailSchema,
   },
