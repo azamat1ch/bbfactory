@@ -29,6 +29,29 @@ export function HumanReviewPanel({
           ? `Selected requirements (${selected.length}): ${selected.join(", ")}`
           : `Delivery approval · all ${task.requirements.length} requirements · spec v${task.specVersion}`}
       </p>
+      {!fingerprint && (
+        <p className="factory-note" role="status">
+          Approval is unavailable because the target workspace cannot be
+          identified. Ask in chat to connect this spec to the correct
+          repository.
+        </p>
+      )}
+      {detail.approvals
+        .filter(
+          (approval) =>
+            approval.accepted &&
+            approval.specVersion === task.specVersion &&
+            approval.fingerprint === fingerprint,
+        )
+        .slice(-1)
+        .map((approval) => (
+          <p className="factory-note" role="status" key={approval.id}>
+            {approval.scope === "delivery"
+              ? "Delivery approved."
+              : `${approval.requirementIds.length} selected requirements approved.`}{" "}
+            Verification coverage is shown separately.
+          </p>
+        ))}
       <div className="factory-actions">
         <Button
           type="button"

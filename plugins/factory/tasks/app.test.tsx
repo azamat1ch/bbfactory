@@ -516,6 +516,40 @@ describe("Factory task evidence", () => {
     await slot.findByText("1 accepted · 0 failed · 0 stale · 4 unverified");
   });
 
+  it("shows persisted delivery approval without changing verification coverage", async () => {
+    const detail = fixture();
+    const approved = {
+      ...detail,
+      approvals: [
+        {
+          id: "approval-1",
+          taskId: detail.task.id,
+          specVersion: detail.task.specVersion,
+          fingerprint: "current-content-sha",
+          scope: "delivery" as const,
+          requirementIds: detail.task.requirements.map((r) => r.id),
+          accepted: true,
+          actor: "User",
+          source: "ui" as const,
+          sourceRef: null,
+          rationale: "",
+          createdAt: 5000,
+        },
+      ],
+    };
+    const slot = mount(detail, {
+      factoryApproveDelivery: vi.fn(async () => approved),
+    });
+    await slot.findByRole("button", { name: "Approve" });
+    fireEvent.click(slot.getByRole("button", { name: "Approve" }));
+    await slot.findByText(
+      "Delivery approved. Verification coverage is shown separately.",
+    );
+    expect(
+      slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
+    ).toBeTruthy();
+  });
+
   it("approves exact selections across pages and filters without a rationale form", async () => {
     const detail = bulkFixture(100);
     const approve = vi.fn(async () => detail);
@@ -731,7 +765,7 @@ describe("Factory task evidence", () => {
     const checkbox = slot.getByRole("checkbox", {
       name: /waitlist message is clear/i,
     });
-    expect(checkbox.hasAttribute("disabled")).toBe(true);
+    expect(checkbox.hasAttribute("disabled")).toBe(false);
     expect(
       slot.getByRole("button", { name: "Approve" }).hasAttribute("disabled"),
     ).toBe(true);
