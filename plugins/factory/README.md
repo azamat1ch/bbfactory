@@ -7,7 +7,8 @@ Direct work is valid. There is no required pipeline or reviewer roster.
 Factory workers appear as visible child threads under the originating conversation.
 
 The card shows outcome, scope and requirements. Expand a requirement for scenarios
-and evidence; approve the delivery or selected rows. Put detailed decisions in
+and evidence; approve the delivery or selected rows. Select all includes every
+requirement across pages and filters. Drafts are refined and activated in chat. Put detailed decisions in
 chat and record them through Factory. Delivery history and current verification
 are separate: a merged delivery remains delivered when later code changes.
 

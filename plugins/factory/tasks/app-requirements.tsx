@@ -292,6 +292,32 @@ export function RequirementNavigator({
           .join(" · ")}{" "}
         accepted
       </p>
+      {selectable && (
+        <div className="factory-actions">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={selectionDisabled || selected.length === rows.length}
+            onClick={() =>
+              onSelectionChange(rows.map((row) => row.requirement.id))
+            }
+          >
+            Select all ({rows.length})
+          </Button>
+          {selected.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={selectionDisabled}
+              onClick={() => onSelectionChange([])}
+            >
+              Deselect all
+            </Button>
+          )}
+        </div>
+      )}
       <div className="factory-filters">
         <input
           type="search"

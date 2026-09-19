@@ -375,28 +375,9 @@ export function TaskDetail({
                 <dd className="factory-mono">{task.environmentId}</dd>
               </dl>
             </details>
-            <div className="factory-actions">
-              <Button
-                type="button"
-                size="sm"
-                disabled={
-                  busy !== null ||
-                  unavailable ||
-                  task.archived ||
-                  task.stopRequested
-                }
-                onClick={() =>
-                  void run("start", () =>
-                    rpc.call("factoryStartTask", {
-                      taskId: task.id,
-                      expectedVersion: task.specVersion,
-                    }),
-                  )
-                }
-              >
-                {busy === "start" ? "Starting…" : "Start task"}
-              </Button>
-            </div>
+            <p className="factory-meta">
+              Refine this draft or ask to begin implementation in chat.
+            </p>
           </section>
         )}
         <div className="factory-section-heading">

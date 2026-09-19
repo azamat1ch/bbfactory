@@ -550,6 +550,29 @@ describe("Factory task evidence", () => {
     ).toBeTruthy();
   });
 
+  it("selects all requirements across pages and filters for one approval", async () => {
+    const detail = bulkFixture(100);
+    const approve = vi.fn(async () => detail);
+    const slot = mount(detail, { factoryApproveDelivery: approve });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    fireEvent.change(slot.getByLabelText("Search requirements"), {
+      target: { value: "number 99" },
+    });
+    fireEvent.click(slot.getByRole("button", { name: "Select all (100)" }));
+    fireEvent.click(slot.getByRole("button", { name: "Approve selected" }));
+    await waitFor(() =>
+      expect(approve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "selected",
+          requirementIds: detail.task.requirements.map((r) => r.id),
+        }),
+      ),
+    );
+    fireEvent.click(slot.getByRole("button", { name: "Select all (100)" }));
+    fireEvent.click(slot.getByRole("button", { name: "Deselect all" }));
+    expect(slot.queryByRole("button", { name: "Approve selected" })).toBeNull();
+  });
+
   it("approves exact selections across pages and filters without a rationale form", async () => {
     const detail = bulkFixture(100);
     const approve = vi.fn(async () => detail);
@@ -704,7 +727,7 @@ describe("Factory task evidence", () => {
     ).toBe(true);
   });
 
-  it("shows the draft stage with its environment and Start, without review or verify forms", async () => {
+  it("shows a draft without a misleading Start execution button", async () => {
     const detail = fixture();
     detail.task = { ...detail.task, phase: "draft", status: "unverified" };
     const start = vi.fn(async () => ({
@@ -729,13 +752,13 @@ describe("Factory task evidence", () => {
     ).toBeNull();
     expect(slot.queryByText("Human review")).toBeNull();
     expect(slot.queryByRole("checkbox")).toBeNull();
-    fireEvent.click(slot.getByRole("button", { name: "Start task" }));
-    await waitFor(() =>
-      expect(start).toHaveBeenCalledWith({
-        taskId: "task-1",
-        expectedVersion: 2,
-      }),
-    );
+    expect(slot.queryByRole("button", { name: "Start task" })).toBeNull();
+    expect(
+      slot.getByText(
+        "Refine this draft or ask to begin implementation in chat.",
+      ),
+    ).toBeTruthy();
+    expect(start).not.toHaveBeenCalled();
   });
 
   it("keeps review actions out of a stopped task", async () => {
