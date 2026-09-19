@@ -84,7 +84,9 @@ describe("Team preferences", () => {
       preference: { mode: "selected", profiles: [selected] },
       expectedRevision: 0,
     });
-    const result = await harness.behavior.callRpc("get", { scope: threadScope });
+    const result = await harness.behavior.callRpc("get", {
+      scope: threadScope,
+    });
     expect(result).toMatchObject({ preference: { profiles: [selected] } });
     expect(harness.inspection.sdk.callsTo("threads.spawn")).toEqual([]);
   });
@@ -92,23 +94,43 @@ describe("Team preferences", () => {
   it("remembers defaults across projects and restart while preserving local overrides", async () => {
     const { harness } = setup();
     await harness.behavior.callRpc("set", {
-      scope: threadScope, preference: { mode: "selected", profiles: [profile] }, expectedRevision: 0,
+      scope: threadScope,
+      preference: { mode: "selected", profiles: [profile] },
+      expectedRevision: 0,
     });
     const replacement = await harness.lifecycle.reload(plugin);
     hosts.push(replacement);
     const h = replacement.harness;
-    expect(await h.behavior.callRpc("get", { scope: { kind: "project", id: "another-project" } }))
-      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    expect(
+      await h.behavior.callRpc("get", {
+        scope: { kind: "project", id: "another-project" },
+      }),
+    ).toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
     await h.behavior.callRpc("set", {
-      scope: { kind: "thread", id: "local-thread" }, preference: { mode: "off", profiles: [] }, expectedRevision: 0, remember: false,
+      scope: { kind: "thread", id: "local-thread" },
+      preference: { mode: "off", profiles: [] },
+      expectedRevision: 0,
+      remember: false,
     });
-    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "fresh-thread" } }))
-      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
-    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "local-thread" } }))
-      .toMatchObject({ preference: { mode: "off" } });
-    await h.behavior.callRpc("reset", { scope: { kind: "thread", id: "local-thread" }, expectedRevision: 1 });
-    expect(await h.behavior.callRpc("get", { scope: { kind: "thread", id: "local-thread" } }))
-      .toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    expect(
+      await h.behavior.callRpc("get", {
+        scope: { kind: "thread", id: "fresh-thread" },
+      }),
+    ).toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
+    expect(
+      await h.behavior.callRpc("get", {
+        scope: { kind: "thread", id: "local-thread" },
+      }),
+    ).toMatchObject({ preference: { mode: "off" } });
+    await h.behavior.callRpc("reset", {
+      scope: { kind: "thread", id: "local-thread" },
+      expectedRevision: 1,
+    });
+    expect(
+      await h.behavior.callRpc("get", {
+        scope: { kind: "thread", id: "local-thread" },
+      }),
+    ).toMatchObject({ preference: { mode: "selected", profiles: [profile] } });
     expect(h.inspection.sdk.callsTo("threads.spawn")).toEqual([]);
   });
 

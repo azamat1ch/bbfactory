@@ -100,3 +100,12 @@ Connect agent instructions:
   links. It defaults to true and still requires active/recent remote usage.
   Use `bb plugin config connect set sendRemoteInstructions false` to turn it
   off. Port sharing remains available.
+
+Inspecting prepared context:
+
+  `bb thread context <id> --configuration` shows the latest BB-prepared
+  instructions, skill catalog and tools for that lead or worker without sending
+  a provider request. Use `--json` for the recorded snapshot and usage.
+  This is the shared configuration before provider adaptation, not a dump of
+  the provider session. Harness-discovered skills/tools are not observed; a
+  snapshot does not prove that a provider accepted or loaded it.

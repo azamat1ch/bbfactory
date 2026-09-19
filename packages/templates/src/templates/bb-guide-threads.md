@@ -190,7 +190,7 @@ Sections:
 
 Inspecting:
 
-  bb thread context [id]                   Show recorded context usage and available breakdown (--self, --json)
+  bb thread context [id]                   Show recorded context usage or prepared configuration (--self, --configuration, --json)
   bb thread show [id]                      Show thread details and pull request status
     --self                                 Target current thread
     --work-status                          Include git working-tree status
@@ -435,7 +435,12 @@ Mutating thread lifecycle and messaging commands require an explicit ID or --sel
 
 `bb thread context [id]` reads the latest stored context measurement without
 starting a provider request. Use `--self` for the current thread and `--json` for
-`{ usage: ... }` (`null` when unavailable). Claude Code refreshes the estimated
+`{ usage: ..., configuration?: ... }` (usage is `null` when unavailable).
+Use `--configuration` to inspect the latest BB-prepared instructions, skill
+catalog and tool names for a lead or worker. The snapshot records preparation
+time and provider/model; it is unavailable until configuration is assembled.
+It excludes secrets and does not observe skills or tools added by the underlying
+harness. Claude Code refreshes the estimated
 breakdown after turns and compaction when its SDK supports context inspection.
 A later aggregate-only measurement replaces any older breakdown. Other providers
 continue to expose their available totals.

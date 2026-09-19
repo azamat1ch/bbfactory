@@ -12,7 +12,10 @@ export function registerContextCommand(
     .description(
       "Show the latest recorded context window usage and available breakdown",
     )
-    .option("--configuration", "Show the latest BB-prepared instructions, skill catalog and tools")
+    .option(
+      "--configuration",
+      "Show the latest BB-prepared instructions, skill catalog and tools",
+    )
     .option("--self", "Use the current thread")
     .option("--json", "Print machine-readable JSON output")
     .action(
@@ -27,7 +30,10 @@ export function registerContextCommand(
           });
           if (outputJson(opts, result)) return;
           if (opts.configuration) {
-            if (!result.configuration) console.log("No BB-prepared configuration snapshot is available. Start a fresh turn to capture one.");
+            if (!result.configuration)
+              console.log(
+                "No BB-prepared configuration snapshot is available. Start a fresh turn to capture one.",
+              );
             else console.log(JSON.stringify(result.configuration, null, 2));
             return;
           }

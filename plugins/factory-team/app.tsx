@@ -234,7 +234,12 @@ function TeamEditor({ scope }: { scope: TeamScope }) {
         aria-label="Team preferences"
       >
         <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={remember} disabled={busy} onChange={(event) => setRemember(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={remember}
+            disabled={busy}
+            onChange={(event) => setRemember(event.target.checked)}
+          />
           Remember for new chats
         </label>
         <div className="mb-3 text-xs text-muted-foreground">

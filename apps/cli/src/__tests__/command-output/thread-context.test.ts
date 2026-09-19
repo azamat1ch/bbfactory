@@ -59,13 +59,34 @@ describe("bb thread context", () => {
 
   it("shows prepared context even when provider token usage is unavailable", async () => {
     const configuration = {
-      capturedAt: 1, providerId: "codex", model: "chosen-model", source: "bb-prepared",
-      instructions: "Factory instructions", skills: [{ name: "factory", description: "Orchestration", sourceType: "builtin" }],
-      tools: [{ name: "bb_factory", description: "Factory" }], harnessAdditions: "not-observed",
+      capturedAt: 1,
+      providerId: "codex",
+      model: "chosen-model",
+      source: "bb-prepared",
+      instructions: "Factory instructions",
+      skills: [
+        {
+          name: "factory",
+          description: "Orchestration",
+          sourceType: "builtin",
+        },
+      ],
+      tools: [{ name: "bb_factory", description: "Factory" }],
+      harnessAdditions: "not-observed",
     };
-    stubServerApi({ "v1.threads.:id.context.$get": vi.fn(async () => ({ usage: null, configuration })) });
-    await runCommand(["thread", "context", "thread-1", "--configuration"], register);
-    expect(JSON.parse(collectLogLines(vi.mocked(console.log)).join("\n"))).toEqual(configuration);
+    stubServerApi({
+      "v1.threads.:id.context.$get": vi.fn(async () => ({
+        usage: null,
+        configuration,
+      })),
+    });
+    await runCommand(
+      ["thread", "context", "thread-1", "--configuration"],
+      register,
+    );
+    expect(
+      JSON.parse(collectLogLines(vi.mocked(console.log)).join("\n")),
+    ).toEqual(configuration);
   });
 
   it("returns explicit missing usage in JSON", async () => {

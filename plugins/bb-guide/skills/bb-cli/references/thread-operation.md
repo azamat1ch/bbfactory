@@ -193,3 +193,12 @@ For review or fix pipelines, get the environment ID from
   same scope, size, and title. It does not replay the original launch command.
 
 Clearing a thread's parent with `bb thread update --clear-parent-thread` inherits the former parent's section unless the update explicitly supplies a section. Children released by environment archiving also inherit their former parent's section.
+
+Inspecting prepared context:
+
+  `bb thread context <id> --configuration` shows the latest BB-prepared
+  instructions, skill catalog and tools for that lead or worker without sending
+  a provider request. Use `--json` for the recorded snapshot and usage.
+  This is the shared configuration before provider adaptation, not a dump of
+  the provider session. Harness-discovered skills/tools are not observed; a
+  snapshot does not prove that a provider accepted or loaded it.

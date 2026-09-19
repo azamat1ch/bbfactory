@@ -52,7 +52,10 @@ export const recordSchema = z.strictObject({
 });
 export const teamRpcContract = defineRpcContract({
   reset: {
-    input: z.strictObject({ scope: scopeSchema, expectedRevision: z.number().int().nonnegative() }),
+    input: z.strictObject({
+      scope: scopeSchema,
+      expectedRevision: z.number().int().nonnegative(),
+    }),
     output: recordSchema,
   },
   get: {

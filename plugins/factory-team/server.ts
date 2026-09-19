@@ -60,13 +60,18 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
     ).run(key(scope), JSON.stringify(record));
   }
   const userScope: TeamScope = { kind: "user", id: "default" };
-  const defaultRecord = () => read(userScope) ?? { preference: DEFAULT_PREFERENCE, revision: 0 };
+  const defaultRecord = () =>
+    read(userScope) ?? { preference: DEFAULT_PREFERENCE, revision: 0 };
   async function get(scope: TeamScope) {
-    if (scope.kind === "user") return { ...defaultRecord(), environmentId: null };
+    if (scope.kind === "user")
+      return { ...defaultRecord(), environmentId: null };
     if (scope.kind === "project") {
       await bb.sdk.projects.get({ projectId: scope.id });
       return {
-        ...(read(scope) ?? { preference: defaultRecord().preference, revision: 0 }),
+        ...(read(scope) ?? {
+          preference: defaultRecord().preference,
+          revision: 0,
+        }),
         environmentId: null,
       };
     }
@@ -100,7 +105,10 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
       write(input.scope, saved);
       if (input.remember && input.scope.kind !== "user") {
         const previous = defaultRecord();
-        write(userScope, { preference: saved.preference, revision: previous.revision + 1 });
+        write(userScope, {
+          preference: saved.preference,
+          revision: previous.revision + 1,
+        });
       }
       return saved;
     })();
@@ -108,15 +116,29 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
     if (input.remember) bb.realtime.publish(TEAM_CHANGED, userScope);
     return record;
   }
-  async function reset({ scope, expectedRevision }: z.infer<typeof teamRpcContract.reset.input>) {
-    if (scope.kind === "user") throw new Error("The user default cannot inherit another scope.");
+  async function reset({
+    scope,
+    expectedRevision,
+  }: z.infer<typeof teamRpcContract.reset.input>) {
+    if (scope.kind === "user")
+      throw new Error("The user default cannot inherit another scope.");
     const current = await get(scope);
-    const inherited = scope.kind === "thread"
-      ? await get({ kind: "project", id: (await bb.sdk.threads.get({ threadId: scope.id })).projectId })
-      : await get(userScope);
+    const inherited =
+      scope.kind === "thread"
+        ? await get({
+            kind: "project",
+            id: (await bb.sdk.threads.get({ threadId: scope.id })).projectId,
+          })
+        : await get(userScope);
     const saved = db.transaction(() => {
-      if ((read(scope)?.revision ?? current.revision) !== expectedRevision) throw new Error("Team changed in another window. Reload before resetting.");
-      const next = { preference: inherited.preference, revision: expectedRevision + 1 };
+      if ((read(scope)?.revision ?? current.revision) !== expectedRevision)
+        throw new Error(
+          "Team changed in another window. Reload before resetting.",
+        );
+      const next = {
+        preference: inherited.preference,
+        revision: expectedRevision + 1,
+      };
       write(scope, next);
       return next;
     })();
@@ -148,22 +170,38 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
       summary: "Read and update this conversation's Team preference",
       commands: {
         reset: cliCommand({
-          summary: "Restore the inherited Team for this scope without changing the remembered default",
+          summary:
+            "Restore the inherited Team for this scope without changing the remembered default",
           options: {
-            thread: { type: "string", description: "Thread ID (defaults to current)" },
-            project: { type: "string", description: "Project whose default to restore" },
+            thread: {
+              type: "string",
+              description: "Thread ID (defaults to current)",
+            },
+            project: {
+              type: "string",
+              description: "Project whose default to restore",
+            },
             json: { type: "boolean", description: "Emit JSON" },
           },
           async run(input, context) {
             const scope = resolveScope(input.options, context.threadId);
             const current = await get(scope);
-            return { exitCode: 0, stdout: formatRecord(await reset({ scope, expectedRevision: current.revision }), input.options.json) };
+            return {
+              exitCode: 0,
+              stdout: formatRecord(
+                await reset({ scope, expectedRevision: current.revision }),
+                input.options.json,
+              ),
+            };
           },
         }),
         get: cliCommand({
           summary: "Read Team mode and implementer profiles",
           options: {
-            global: { type: "boolean", description: "Use the remembered default across all projects" },
+            global: {
+              type: "boolean",
+              description: "Use the remembered default across all projects",
+            },
             thread: {
               type: "string",
               description: "Thread ID (defaults to the current thread)",
@@ -187,7 +225,10 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
           summary:
             "Save Auto, Off, or Selected implementers; never launches workers",
           options: {
-            global: { type: "boolean", description: "Use the remembered default across all projects" },
+            global: {
+              type: "boolean",
+              description: "Use the remembered default across all projects",
+            },
             thread: {
               type: "string",
               description: "Thread ID (defaults to the current thread)",
@@ -196,7 +237,11 @@ export default function plugin(bb: BbPluginApi, initializeStorage = true) {
               type: "string",
               description: "Set defaults for new conversations in this project",
             },
-            local: { type: "boolean", description: "Save only this scope without changing the remembered default" },
+            local: {
+              type: "boolean",
+              description:
+                "Save only this scope without changing the remembered default",
+            },
             mode: {
               type: "enum",
               values: ["auto", "off", "selected"],
@@ -250,7 +295,9 @@ function resolveScope(
   options: { thread?: string; project?: string; global?: boolean },
   threadId: string | undefined,
 ): TeamScope {
-  if ([options.thread, options.project, options.global].filter(Boolean).length > 1)
+  if (
+    [options.thread, options.project, options.global].filter(Boolean).length > 1
+  )
     throw new PluginCliError("Use one of --thread, --project or --global.", {
       code: "invalid_scope",
     });

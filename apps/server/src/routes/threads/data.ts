@@ -396,7 +396,8 @@ export function registerThreadDataRoutes(app: Hono, deps: AppDeps): void {
       sequenceStart,
     });
     const snapshot = threadConfigurationSnapshotSchema.safeParse(
-      getThreadPluginMetadata(deps.db, thread.id, "bb-agent-context").metadata.snapshot,
+      getThreadPluginMetadata(deps.db, thread.id, "bb-agent-context").metadata
+        .snapshot,
     );
     return context.json({
       ...(snapshot.success ? { configuration: snapshot.data } : {}),

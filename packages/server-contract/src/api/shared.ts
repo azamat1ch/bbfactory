@@ -45,7 +45,13 @@ export const threadConfigurationSnapshotSchema = z.object({
   model: z.string(),
   source: z.literal("bb-prepared"),
   instructions: z.string(),
-  skills: z.array(z.object({ name: z.string(), description: z.string(), sourceType: z.string() })),
+  skills: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      sourceType: z.string(),
+    }),
+  ),
   tools: z.array(z.object({ name: z.string(), description: z.string() })),
   harnessAdditions: z.literal("not-observed"),
 });
