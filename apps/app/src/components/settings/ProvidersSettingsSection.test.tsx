@@ -111,6 +111,35 @@ describe("ProvidersSettingsSection", () => {
     ).toBe(true);
   });
 
+  it("keeps disabled providers visible and reenables the exact provider", () => {
+    mocks.providers = [
+      provider("acp-devin", "Devin"),
+      provider("acp-opencode", "OpenCode"),
+    ];
+    const onChange = vi.fn();
+    render(
+      <ProvidersSettingsSection
+        disabled={false}
+        generalSettings={{
+          ...defaultAppSettings,
+          defaultProviderId: "acp-devin",
+          disabledProviderIds: ["acp-devin"],
+        }}
+        onGeneralSettingsChange={onChange}
+      />,
+    );
+    expect(screen.getByText("Disabled")).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch", { name: "Enable Devin" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...defaultAppSettings,
+      defaultProviderId: "acp-devin",
+      disabledProviderIds: [],
+    });
+    expect(
+      screen.getByRole("switch", { name: "Disable OpenCode" }),
+    ).toBeTruthy();
+  });
+
   it("shows each provider's finished turn display and stores only overrides", () => {
     mocks.providers = [
       {

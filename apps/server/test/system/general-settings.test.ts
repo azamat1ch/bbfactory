@@ -52,6 +52,7 @@ describe("general settings", () => {
           steerActiveThreadOnEnter: true,
           providerOrder: ["pi", "codex"],
           defaultProviderId: "pi",
+          disabledProviderIds: ["acp-devin"],
         }),
       });
       expect(put.status).toBe(200);
@@ -68,6 +69,7 @@ describe("general settings", () => {
         steerActiveThreadOnEnter: true,
         providerOrder: ["pi", "codex"],
         defaultProviderId: "pi",
+        disabledProviderIds: ["acp-devin"],
         showUnhandledProviderEvents: false,
       });
       expect(getAppSettings(harness.db)).toEqual({
@@ -76,6 +78,7 @@ describe("general settings", () => {
         steerActiveThreadOnEnter: true,
         providerOrder: ["pi", "codex"],
         defaultProviderId: "pi",
+        disabledProviderIds: ["acp-devin"],
       });
 
       const config = await harness.app.request("/api/v1/system/config");
@@ -89,6 +92,7 @@ describe("general settings", () => {
         steerActiveThreadOnEnter: true,
         providerOrder: ["pi", "codex"],
         defaultProviderId: "pi",
+        disabledProviderIds: ["acp-devin"],
       });
     });
   });

@@ -19,6 +19,7 @@ export const appSettingsSchema = z
     steerActiveThreadOnEnter: z.boolean(),
     showDiagnosticEvents: z.boolean(),
     providerOrder: z.array(z.string().min(1)),
+    disabledProviderIds: z.array(z.string().min(1)),
     defaultProviderId: z.string().min(1).nullable(),
     providerCompletedTurnDisplay: z.record(
       z.string().min(1),
@@ -50,6 +51,7 @@ export const defaultAppSettings: AppSettings = {
   steerActiveThreadOnEnter: true,
   showDiagnosticEvents: false,
   providerOrder: [],
+  disabledProviderIds: [],
   defaultProviderId: null,
   providerCompletedTurnDisplay: {},
   streamerMode: false,

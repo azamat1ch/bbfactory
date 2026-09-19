@@ -736,7 +736,11 @@ describe("@bb/sdk", () => {
     });
 
     await expect(
-      sdk.providers.list({ capability: "usage", hostId: "host_remote" }),
+      sdk.providers.list({
+        capability: "usage",
+        hostId: "host_remote",
+        includeDisabled: true,
+      }),
     ).resolves.toEqual([]);
     await expect(
       sdk.providers.models({
@@ -749,12 +753,38 @@ describe("@bb/sdk", () => {
       {
         bodyText: undefined,
         method: "GET",
-        url: "http://bb.test/api/v1/system/providers?capability=usage&hostId=host_remote",
+        url: "http://bb.test/api/v1/system/providers?capability=usage&includeDisabled=true&hostId=host_remote",
       },
       {
         bodyText: undefined,
         method: "GET",
         url: "http://bb.test/api/v1/system/execution-options?environmentId=env_remote&providerId=acp-remote",
+      },
+    ]);
+  });
+
+  it("updates individual provider enablement", async () => {
+    const queue = createFetchQueue([
+      { body: { providerId: "acp-devin", enabled: false } },
+    ]);
+    const sdk = createBbSdk({
+      transport: createHttpTransport({
+        baseUrl: "http://bb.test",
+        fetch: queue.fetch,
+        runtime: "node",
+      }),
+    });
+    await expect(
+      sdk.providers.experimental_setEnabled({
+        providerId: "acp-devin",
+        enabled: false,
+      }),
+    ).resolves.toEqual({ providerId: "acp-devin", enabled: false });
+    expect(queue.requests).toEqual([
+      {
+        bodyText: JSON.stringify({ enabled: false }),
+        method: "PUT",
+        url: "http://bb.test/api/v1/system/providers/acp-devin/enabled",
       },
     ]);
   });

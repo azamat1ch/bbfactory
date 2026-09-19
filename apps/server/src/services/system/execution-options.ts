@@ -38,6 +38,7 @@ import { getSupportedReasoningLevelsForProvider } from "../threads/thread-reason
 import { resolveSystemLookupHostId } from "./host-lookup.js";
 import { resolveBridgeLaunchForProviderId } from "./provider-bridge-launch.js";
 import { mapProviderMaintenanceRequests } from "./provider-maintenance-concurrency.js";
+import { requireProviderEnabled } from "../providers/provider-eligibility.js";
 
 type SystemExecutionOptionsRequest = SystemExecutionOptionsQuery;
 
@@ -108,15 +109,21 @@ function providerMatchesCapability(
 }
 
 function listConfiguredSystemProviderInfos(
-  deps: Pick<LoggedWorkSessionDeps, "providerRegistry">,
+  deps: Pick<LoggedWorkSessionDeps, "db" | "providerRegistry">,
   capability?: ProviderCapabilityFilter,
+  includeDisabled = false,
 ): ProviderInfo[] {
+  const disabledProviderIds = includeDisabled
+    ? null
+    : new Set(getAppSettings(deps.db).disabledProviderIds);
   return deps.providerRegistry
     .list()
     .filter(
       (entry) =>
         entry.visibility === "always" &&
-        providerMatchesCapability(entry.info, capability),
+        providerMatchesCapability(entry.info, capability) &&
+        (disabledProviderIds === null ||
+          !disabledProviderIds.has(entry.info.id)),
     )
     .map((entry) => entry.info);
 }
@@ -146,13 +153,19 @@ async function listInstalledPluginProviderInfos(
   deps: LoggedWorkSessionDeps,
   hostId: string,
   capability?: ProviderCapabilityFilter,
+  includeDisabled = false,
 ): Promise<ProviderInfo[]> {
+  const disabledProviderIds = includeDisabled
+    ? null
+    : new Set(getAppSettings(deps.db).disabledProviderIds);
   const registrations = deps.providerRegistry
     .list()
     .filter(
       (registration) =>
         registration.visibility === "installed" &&
-        providerMatchesCapability(registration.info, capability),
+        providerMatchesCapability(registration.info, capability) &&
+        (disabledProviderIds === null ||
+          !disabledProviderIds.has(registration.info.id)),
     );
   const budget = createProviderListingBudget();
   const results = await mapProviderMaintenanceRequests(
@@ -218,12 +231,18 @@ export async function listSystemProviderInfosForHost(
   deps: LoggedWorkSessionDeps,
   hostId: string,
   capability?: ProviderCapabilityFilter,
+  includeDisabled = false,
 ): Promise<ProviderInfo[]> {
-  const configured = listConfiguredSystemProviderInfos(deps, capability);
+  const configured = listConfiguredSystemProviderInfos(
+    deps,
+    capability,
+    includeDisabled,
+  );
   const installed = await listInstalledPluginProviderInfos(
     deps,
     hostId,
     capability,
+    includeDisabled,
   );
   const visibleIds = new Set([
     ...configured.map((provider) => provider.id),
@@ -249,6 +268,7 @@ function resolveSystemProviderInfosPlan(
         deps,
         hostId,
         query.capability,
+        query.includeDisabled === "true",
       ),
     };
   } catch (error) {
@@ -265,7 +285,11 @@ function resolveSystemProviderInfosPlan(
       hostId: null,
       hostLookupError: error,
       providersPromise: Promise.resolve(
-        listConfiguredSystemProviderInfos(deps, query.capability),
+        listConfiguredSystemProviderInfos(
+          deps,
+          query.capability,
+          query.includeDisabled === "true",
+        ),
       ),
     };
   }
@@ -283,6 +307,7 @@ export async function resolveSystemProviderModels(
   deps: LoggedWorkSessionDeps,
   args: ResolveSystemProviderModelsArgs,
 ): Promise<ModelListResult> {
+  requireProviderEnabled(deps.db, args.providerId);
   await deps.providerRegistry.whenProviderRegistered(args.providerId);
   const provider = includeRequestedRegisteredProvider(
     deps,
@@ -415,6 +440,9 @@ async function resolveExecutionOptions(
   query: SystemExecutionOptionsRequest,
   access: ProviderModelCatalogAccess,
 ): Promise<SystemExecutionOptionsResponse> {
+  if (query.providerId !== undefined) {
+    requireProviderEnabled(deps.db, query.providerId);
+  }
   if (query.providerId === undefined) {
     await deps.providerRegistry.whenRegistrationsSettled();
   } else {

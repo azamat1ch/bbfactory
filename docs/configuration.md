@@ -267,8 +267,19 @@ after you change it; it does not rename an existing branch or worktree. Set it
 with `bb settings general managedBranchPrefix <prefix>`.
 
 Settings → Providers lists every registered agent provider in picker order.
+Each row can be disabled independently of its plugin. Disabled providers stay
+visible here for reenabling, but are omitted from new-thread choices, model
+discovery, Team choices, readiness checks, and subscription usage polling.
+Existing history and already-running workers remain visible. A saved project
+default that names a disabled provider is rejected instead of silently using a
+different provider. Use `bb provider list --all`, `bb provider enable <id>`,
+and `bb provider disable <id>` from the CLI, or
+`sdk.providers.list({ includeDisabled: true })` and
+`sdk.providers.experimental_setEnabled({ providerId, enabled })` from the SDK.
+
 Move a provider up or down to change the order and choose the default for new
-threads. Both are persisted preferences: `providerOrder` is the list of ids
+threads. These are persisted preferences: `disabledProviderIds` stores the
+exact disabled IDs, `providerOrder` is the list of ids
 that lead the picker (ids not listed follow in plugin install order, and an id
 that names no registered provider is ignored) and `defaultProviderId` is the
 provider new threads use when neither the caller nor the project chose one

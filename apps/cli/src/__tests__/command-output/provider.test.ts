@@ -33,6 +33,41 @@ describe("bb provider command output", () => {
     expect(help).toContain("--machine <id-or-name>");
     expect(help).toContain("--host <id-or-name>");
     expect(help).toContain("--environment <id>");
+    expect(help).toContain("--all");
+  });
+
+  it("disables and enables an installed provider", async () => {
+    const list = vi.fn(async () => [
+      { id: "acp-devin", displayName: "Devin" },
+      { id: "acp-opencode", displayName: "OpenCode" },
+    ]);
+    const update = vi.fn(async ({ json }) => ({
+      providerId: "acp-devin",
+      enabled: json.enabled,
+    }));
+    stubServerApi({
+      "v1.system.providers.$get": list,
+      "v1.system.providers.:id.enabled.$put": update,
+    });
+
+    await runCommand(["provider", "disable", "acp-devin"], register);
+    await runCommand(["provider", "enable", "acp-devin", "--json"], register);
+
+    expect(list).toHaveBeenCalledWith({
+      query: { includeDisabled: "true" },
+    });
+    expect(update).toHaveBeenNthCalledWith(1, {
+      param: { id: "acp-devin" },
+      json: { enabled: false },
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      param: { id: "acp-devin" },
+      json: { enabled: true },
+    });
+    expect(collectLogPayloads(vi.mocked(console.log))).toEqual([
+      "Devin disabled",
+      JSON.stringify({ providerId: "acp-devin", enabled: true }, null, 2),
+    ]);
   });
 
   it("bb provider list resolves a machine and preserves portable JSON output", async () => {

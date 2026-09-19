@@ -15,6 +15,7 @@ import {
 } from "../cache-owners/system-cache-effects";
 import {
   beginKeyboardSettingsCacheTransaction,
+  readCachedDisabledProviderIds,
   readCachedProviderOrder,
   readCachedStreamerMode,
   rollbackKeyboardSettingsCacheTransaction,
@@ -47,6 +48,8 @@ export function useUpdateGeneralSettings() {
     onSuccess: (_settings, written) => {
       const previousStreamerMode = readCachedStreamerMode(queryClient);
       const previousProviderOrder = readCachedProviderOrder(queryClient);
+      const previousDisabledProviderIds =
+        readCachedDisabledProviderIds(queryClient);
       invalidateGeneralSettingsDependencies({ queryClient });
       if (previousStreamerMode !== written.streamerMode) {
         void resetModelCatalogsAfterStreamerModeChange({ queryClient });
@@ -57,7 +60,15 @@ export function useUpdateGeneralSettings() {
         previousProviderOrder.some(
           (providerId, index) => providerId !== written.providerOrder[index],
         );
-      if (providerOrderChanged) {
+      const disabledProviderIdsChanged =
+        previousDisabledProviderIds === undefined ||
+        previousDisabledProviderIds.length !==
+          written.disabledProviderIds.length ||
+        previousDisabledProviderIds.some(
+          (providerId, index) =>
+            providerId !== written.disabledProviderIds[index],
+        );
+      if (providerOrderChanged || disabledProviderIdsChanged) {
         return invalidateSystemProviders({ queryClient });
       }
     },

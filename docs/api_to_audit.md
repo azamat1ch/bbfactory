@@ -3203,6 +3203,20 @@ remain forbidden. New-machine selections continue through creation.
 Stabilization requires lifecycle coverage for reuse, missing paths, cleanup in
 progress, cross-project ownership, and concurrent creation before binding.
 
+## Provider enablement SDK
+
+`bb.sdk.providers.list({ includeDisabled: true })` returns installed provider
+metadata for administrative settings while the default list remains restricted
+to enabled providers. `bb.sdk.providers.experimental_setEnabled({ providerId, enabled })`
+changes the server-owned exact-ID policy used by new work and usage polling.
+The operation does not change plugin installation, infer authentication or
+subscription capacity, or stop existing provider sessions.
+
+Stabilization requires auditing authorization for remote callers, provider
+removal races, concurrent settings writes, disabled saved project defaults,
+multi-host installed discovery, and the distinction between enablement,
+availability, authentication, and capacity.
+
 ## Native Workflows execution RPC
 
 `workflows` publishes `experimental_executionStart`,

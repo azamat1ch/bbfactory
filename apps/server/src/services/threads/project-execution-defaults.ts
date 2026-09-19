@@ -1,5 +1,6 @@
 import {
   getProjectExecutionDefaults,
+  getAppSettings,
   upsertProjectExecutionDefaults,
 } from "@bb/db";
 import type {
@@ -97,6 +98,7 @@ export function resolveProjectExecutionDefaultsForCreate(
     {
       requestedProviderId,
       storedDefaults,
+      disabledProviderIds: getAppSettings(deps.db).disabledProviderIds,
     },
   );
   const { executionDefaults, providerId, providerFallbackCandidates } =

@@ -198,6 +198,8 @@ import type {
   SystemEnvironmentProvidersResponse,
   SystemMachineProvidersResponse,
   SystemProviderInfo,
+  SystemProviderEnabledResponse,
+  SystemProviderEnabledUpdate,
   SystemProvidersQuery,
   SystemProviderStatesResponse,
   SystemUsageLimitsQuery,
@@ -347,6 +349,7 @@ import {
   systemExecutionOptionsQuerySchema,
   systemEnvironmentProvidersQuerySchema,
   systemProvidersQuerySchema,
+  systemProviderEnabledUpdateSchema,
   systemUsageLimitsQuerySchema,
   systemVersionQuerySchema,
   threadEventWaitQuerySchema,
@@ -1862,6 +1865,14 @@ export const publicApiRoutes = {
         systemProvidersQuerySchema,
       ),
       response: jsonResponse<SystemProviderInfo[]>(),
+    }),
+    providerEnabled: defineRoute({
+      path: "/system/providers/:id/enabled",
+      method: "put",
+      request: jsonRequest<PathId, SystemProviderEnabledUpdate>(
+        systemProviderEnabledUpdateSchema,
+      ),
+      response: jsonResponse<SystemProviderEnabledResponse>(),
     }),
     providerLogo: defineRoute({
       path: "/system/providers/:id/logo",

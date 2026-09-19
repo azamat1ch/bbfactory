@@ -85,6 +85,7 @@ import {
 import { environmentProviderMachineAvailability } from "../services/environments/provider-machine-availability.js";
 import { machineProviderAcceptsEmptyInputs } from "../services/machines/provider-availability.js";
 import { requirePublicProject } from "../services/lib/entity-lookup.js";
+import { setProviderEnabled } from "../services/providers/provider-eligibility.js";
 
 const LEADING_ENVIRONMENT_PROVIDER_IDS: readonly string[] = [
   "project-checkout",
@@ -578,6 +579,20 @@ export function registerSystemRoutes(
   get(routes.providers, async (context, query) =>
     context.json(await listSystemProviderInfos(deps, query)),
   );
+
+  put(routes.providerEnabled, (context, payload) => {
+    const providerId = context.req.param("id");
+    if (deps.providerRegistry.get(providerId) === null) {
+      throw new ApiError(
+        404,
+        "provider_not_found",
+        `Provider '${providerId}' is not installed.`,
+      );
+    }
+    setProviderEnabled(deps.db, providerId, payload.enabled);
+    deps.hub.notifySystem(["config-changed"]);
+    return context.json({ providerId, enabled: payload.enabled });
+  });
 
   get(routes.providerLogo, async (context) => {
     const providerId = context.req.param("id");

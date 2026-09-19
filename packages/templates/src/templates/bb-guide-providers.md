@@ -9,15 +9,22 @@ Provider commands
 
 Providers are agent backends (e.g., codex, claude-code). Each supports different models.
 
-  bb provider list [--machine <id-or-name> | --environment <id>]
+  bb provider list [--all] [--machine <id-or-name> | --environment <id>]
                                           List available providers
   bb provider models [providerId] [--machine <id-or-name> | --environment <id>]
                                           List models for a provider
+  bb provider enable <providerId>          Offer a provider for new work
+  bb provider disable <providerId>         Exclude a provider from new work
 
 Use these before spawning threads if you are unsure which provider or model to use.
 `--host` is an alias for `--machine`. Machine and environment selectors are
 mutually exclusive because an environment already selects its machine. When no
 selector is supplied, both commands intentionally inspect the server machine.
+`list` shows enabled providers by default; `--all` also shows disabled installed
+providers. Enablement is independent of plugin installation and uses exact IDs,
+such as `acp-devin`. Disabling a provider removes it from new choices and usage
+polling. A saved disabled selection fails clearly, while existing history and
+already-running workers remain available.
 When provider and model are omitted from bb thread spawn, the project's
 remembered defaults apply. If the project has no remembered choice, bb uses
 the explicitly requested provider or Codex, then resolves the model marked
