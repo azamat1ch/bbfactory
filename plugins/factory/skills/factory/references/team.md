@@ -2,7 +2,9 @@
 
 Team is the user's saved delegation preference: whether the lead works
 directly or may delegate, and which provider/model profiles are eligible
-workers. It is guidance to the lead, not a launch-permission gate. Validate
+workers. These are binding delegation constraints unless the user explicitly overrides
+them for the current task. They apply to implementation, research and review,
+including lower-level thread launches. Validate
 current provider availability, permissions and workspace isolation before
 launching a worker, and never silently substitute an unavailable or unselected
 profile.
@@ -16,7 +18,8 @@ bb factory team get --project <id> --json   # defaults for new conversations in 
 bb factory team get --global --json     # the user-level default across projects
 ```
 
-Read it before each new task and before choosing workers. Explicit user
+You MUST read it before each new task and before choosing workers; reread after
+a Team change. Selected profiles include their saved reasoning and service tier. Explicit user
 directions for the current task override the preference for that task; do not
 silently change the saved preference.
 

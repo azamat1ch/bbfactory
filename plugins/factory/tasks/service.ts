@@ -509,7 +509,7 @@ export function createFactoryService(
     })();
     return {
       task: detail.task,
-      previewDirective: `::factory-task{taskId="${taskId}"}`,
+      previewDirective: `::factory-task{taskId="${taskId}" open="true"}`,
     };
   }
   const service = {

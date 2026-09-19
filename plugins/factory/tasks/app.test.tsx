@@ -1033,6 +1033,40 @@ describe("Factory task evidence", () => {
     expect(list).toHaveBeenCalledTimes(2);
   });
 
+  it("opens a presented spec once and respects closing it across remounts", async () => {
+    sessionStorage.clear();
+    const detail = fixture();
+    const props = {
+      attributes: { taskId: "task-1", open: "true" },
+      source: '::factory-task{taskId="task-1" open="true"}',
+      message: {
+        id: "auto-open-message",
+        threadId: "lead-1",
+        turnId: null,
+        projectId: "project-1",
+      },
+      openWorkspaceFile: null,
+    };
+    const options = {
+      rpc: { factoryGetTask: vi.fn(async () => detail) },
+      openThreadPanel: () => true,
+    };
+    const slot = renderSlot(directive, props, options);
+    await slot.findByText(detail.task.goal);
+    await waitFor(() => expect(slot.navigateCalls).toHaveLength(1));
+    expect(slot.navigateCalls[0]).toMatchObject({
+      method: "openThreadPanel",
+      options: { params: { taskId: "task-1" } },
+    });
+    await slot.emitRealtime("factory-tasks", { taskId: "task-1" });
+    expect(slot.navigateCalls).toHaveLength(1);
+    slot.unmount();
+    const reopened = renderSlot(directive, props, options);
+    await reopened.findByText(detail.task.goal);
+    expect(reopened.navigateCalls).toHaveLength(0);
+    sessionStorage.clear();
+  });
+
   it("does not present cached acceptance as current while disconnected or after refresh failure", async () => {
     const detail = fixture();
     detail.task.status = "accepted";

@@ -43,9 +43,13 @@ every listed method (`automated`, `agent`, `human`). `start` activates the
 agreed version without launching workers; `verify` runs linked checks on
 final content.
 
+When presenting a spec, emit its preview directive once on its own line. For an
+existing task use `::factory-task{taskId="<id>" open="true"}` so it opens in the
+side panel. Do not repeat the directive in progress updates.
+
 ## Team, assignments, supervision
 
-Read the saved Team preference (`bb factory team get --json`) before choosing
+You MUST read the saved Team preference (`bb factory team get --json`) before choosing
 workers: **Off** stays direct unless overridden, **Auto** permits
 discretionary delegation, **Selected** restricts eligible profiles without
 requiring any launch. Explicit user directions for the current task override

@@ -144,13 +144,44 @@ function GoalCard({
   );
 }
 
-function FactoryTaskDirective({ attributes }: PluginMessageDirectiveProps) {
+function FactoryTaskDirective({
+  attributes,
+  message: context,
+}: PluginMessageDirectiveProps) {
   const taskId =
     typeof attributes.taskId === "string" && attributes.taskId.trim()
       ? attributes.taskId
       : null;
   const { state, refresh, connected } = useTask(taskId);
   const navigate = useBbNavigate();
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!taskId || state.kind !== "ready" || attributes.open !== "true") return;
+    const key = `factory-spec-open:${context.threadId}:${context.id}:${taskId}`;
+    if (opened.current === key) return;
+    try {
+      if (sessionStorage.getItem(key)) return;
+    } catch {}
+    if (
+      navigate.openThreadPanel({
+        actionId: FACTORY_PANEL_ACTION_ID,
+        title: "Factory task",
+        params: { taskId },
+      })
+    ) {
+      opened.current = key;
+      try {
+        sessionStorage.setItem(key, "1");
+      } catch {}
+    }
+  }, [
+    taskId,
+    state.kind,
+    attributes.open,
+    context.threadId,
+    context.id,
+    navigate,
+  ]);
   if (!taskId) return <p className="factory-note">Task reference missing.</p>;
   if (state.kind === "loading")
     return (

@@ -6,6 +6,10 @@ use the [Factory skill](skills/factory/SKILL.md) when work needs orchestration.
 Direct work is valid. There is no required pipeline or reviewer roster.
 Factory workers appear as visible child threads under the originating conversation.
 
+Presented specs open in the side panel once per message in the browser session;
+closing the panel is respected. Existing references can opt in with
+`::factory-task{taskId="<id>" open="true"}`.
+
 The card shows outcome, scope and requirements. Expand a requirement for scenarios
 and evidence; approve the delivery or selected rows. Select all includes every
 requirement across pages and filters. Drafts are refined and activated in chat. Put detailed decisions in
