@@ -69,7 +69,7 @@ never launch work or persist data.
    navigation opens actual worker threads and workspace diffs.
 
    The prospective bbfactory contract source is
-   `plugins/bbfactory/src/shared.ts` (`factoryRpcContract`), with `app.tsx` and
+   `plugins/factory/tasks/shared.ts` (`factoryRpcContract`), with `app.tsx` and
    `server.ts` in that directory. These are concurrent implementation work in
    the `factory-slice` worktree, **not accepted APIs or files present on this
    prototype branch**. Bind to the reviewed task/attempt/evidence records after

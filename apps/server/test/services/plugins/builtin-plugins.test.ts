@@ -39,6 +39,20 @@ import { copyPluginRuntime } from "@bb/plugin-build";
 import { testLogger } from "../../helpers/test-app.js";
 import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
+const executionDataPath = fileURLToPath(
+  new URL("../../../../../plugins/workflows/src/data.ts", import.meta.url),
+);
+const {
+  createRun,
+  migrations: executionMigrations,
+}: {
+  migrations: string[];
+  createRun(
+    db: DbConnection["$client"],
+    input: Record<string, string | null>,
+  ): { id: string };
+} = await import(executionDataPath);
+
 const logger = testLogger as unknown as Logger;
 const testDir = dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = resolve(
@@ -288,7 +302,7 @@ describe("builtin plugin reconciliation", () => {
   it("gives every builtin plugin a deliberate settings icon", async () => {
     const expectedIcons = new Map([
       ["bb-guide", "Explore"],
-      ["factory-team", "Workflow"],
+      ["factory", "Workflow"],
       ["account-pool", "Layers"],
       ["ask-user-question", "MessageQuestion"],
       ["automations", "Repeat"],
@@ -533,6 +547,172 @@ describe("builtin plugin reconciliation", () => {
     expect(loadCount()).toBe(0);
   });
 
+  it.each([
+    { owner: "workflows", action: "disable" },
+    { owner: "workflows", action: "remove" },
+    { owner: "factory-team", action: "disable" },
+    { owner: "factory-team", action: "remove" },
+  ])(
+    "blocks $action of $owner until durable execution ownership settles",
+    async ({ owner, action }) => {
+      const { targetRoot } = await copyPackagedBuiltinRuntime(workDir, [owner]);
+      const dataDir = join(workDir, "data");
+      const ownerDir = join(dataDir, "plugins", owner);
+      await mkdir(ownerDir, { recursive: true });
+      const ownerPath = join(ownerDir, "data.db");
+      const ownerDb = createConnection(ownerPath);
+      migrate(ownerDb);
+      try {
+        ownerDb.$client.exec(executionMigrations.join("\n"));
+        const run = createRun(ownerDb.$client, {
+          projectId: "project",
+          originThreadId: "origin",
+          environmentId: "environment",
+          originProvider: "codex",
+          originModel: "model",
+          originReasoningLevel: "low",
+          originPermissionMode: "full",
+          name: "owned-run",
+          source: "return null",
+          sourceHash: "hash",
+          argsJson: "null",
+          settingsJson: "{}",
+          resumedFromRunId: null,
+        });
+        service = createService({
+          db,
+          dataDir,
+          builtinName: owner === "factory-team" ? "factory" : owner,
+          pluginId: owner,
+          rootDir: join(targetRoot, owner),
+        });
+        await service.start();
+        const ownerService = service;
+        const mutate = () =>
+          action === "disable"
+            ? ownerService.setEnabled(owner, false)
+            : ownerService.remove(owner);
+        const assertRetained = () => {
+          expect(ownerService.list()).toMatchObject([
+            { id: owner, enabled: true, status: "running" },
+          ]);
+          expect(
+            db.$client
+              .prepare("SELECT enabled, removed_at FROM plugins WHERE id = ?")
+              .get(owner),
+          ).toEqual({ enabled: 1, removed_at: null });
+          expect(
+            ownerDb.$client
+              .prepare("SELECT id FROM workflow_runs")
+              .pluck()
+              .all(),
+          ).toEqual([run.id]);
+          expect(packagedLoadCount()).toBe(1);
+        };
+        for (const status of ["queued", "running"]) {
+          ownerDb.$client
+            .prepare("UPDATE workflow_runs SET status = ? WHERE id = ?")
+            .run(status, run.id);
+          await expect(mutate()).rejects.toThrow(
+            `${owner} retains active or unresolved execution ownership`,
+          );
+          assertRetained();
+        }
+        ownerDb.$client
+          .prepare("UPDATE workflow_runs SET status = 'cancelled' WHERE id = ?")
+          .run(run.id);
+        ownerDb.$client
+          .prepare("INSERT INTO workflow_spawn_attempts VALUES (?, ?, ?, ?)")
+          .run("call", run.id, "worker", "requested");
+        for (const state of ["requested", "attached"]) {
+          ownerDb.$client
+            .prepare(
+              "UPDATE workflow_spawn_attempts SET state = ? WHERE call_id = ?",
+            )
+            .run(state, "call");
+          await expect(mutate()).rejects.toThrow(
+            `${owner} retains active or unresolved execution ownership`,
+          );
+          assertRetained();
+        }
+        ownerDb.$client
+          .prepare(
+            "UPDATE workflow_spawn_attempts SET state = 'stopped' WHERE call_id = ?",
+          )
+          .run("call");
+        if (action === "disable") {
+          await expect(mutate()).resolves.toMatchObject({
+            id: owner,
+            enabled: false,
+            status: "disabled",
+          });
+          expect(
+            db.$client
+              .prepare("SELECT enabled, removed_at FROM plugins WHERE id = ?")
+              .get(owner),
+          ).toEqual({ enabled: 0, removed_at: null });
+        } else {
+          await expect(mutate()).resolves.toBe(true);
+          expect(ownerService.list()).toEqual([]);
+          expect(
+            db.$client
+              .prepare("SELECT removed_at FROM plugins WHERE id = ?")
+              .pluck()
+              .get(owner),
+          ).toEqual(expect.any(Number));
+        }
+        expect((await stat(ownerPath)).isFile()).toBe(true);
+        expect(
+          ownerDb.$client.prepare("SELECT id FROM workflow_runs").pluck().all(),
+        ).toEqual([run.id]);
+      } finally {
+        ownerDb.$client.close();
+      }
+    },
+  );
+
+  it.each([true, false])(
+    "preserves saved Workflows enabled=%s when the bundled default changes to false",
+    async (enabled) => {
+      const { targetRoot } = await copyPackagedBuiltinRuntime(workDir, [
+        "workflows",
+      ]);
+      const dataDir = join(workDir, "data");
+      const rootDir = join(targetRoot, "workflows");
+      service = createService({
+        db,
+        dataDir,
+        builtinName: "workflows",
+        rootDir,
+        defaultEnabled: true,
+      });
+      await service.start();
+      await service.setEnabled("workflows", enabled);
+      await service.stop();
+      const shippedDefault = BUILTIN_PLUGINS.find(
+        (plugin) => plugin.pluginId === "workflows",
+      )?.defaultEnabled;
+      expect(shippedDefault).toBe(false);
+      service = createService({
+        db,
+        dataDir,
+        builtinName: "workflows",
+        rootDir,
+        defaultEnabled: shippedDefault,
+      });
+      await service.start();
+      expect(service.list()).toMatchObject([
+        { id: "workflows", enabled, status: enabled ? "running" : "disabled" },
+      ]);
+      expect(
+        db.$client
+          .prepare("SELECT enabled FROM plugins WHERE id = 'workflows'")
+          .pluck()
+          .get(),
+      ).toBe(enabled ? 1 : 0);
+    },
+  );
+
   it("ships Plugin API Tester disabled on a fresh database", () => {
     const pluginApiTester = BUILTIN_PLUGINS.find(
       (builtin) => builtin.name === "plugin-api-tester",
@@ -574,11 +754,11 @@ describe("builtin plugin reconciliation", () => {
     ]);
   });
 
-  it("ships Workflows enabled on a fresh database", async () => {
+  it("ships Workflows disabled on a fresh database", async () => {
     const workflows = BUILTIN_PLUGINS.find(
       (builtin) => builtin.name === "workflows",
     );
-    expect(workflows?.defaultEnabled).toBe(true);
+    expect(workflows?.defaultEnabled).toBe(false);
 
     service = createService({
       db,
@@ -593,8 +773,8 @@ describe("builtin plugin reconciliation", () => {
       {
         id: "workflows",
         source: "builtin:workflows",
-        enabled: true,
-        status: "running",
+        enabled: false,
+        status: "disabled",
       },
     ]);
   });

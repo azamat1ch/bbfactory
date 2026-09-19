@@ -930,16 +930,16 @@ Modal image debugging: `bb modal image build [--json]` prepares the saved image;
 ## Factory
 
 The bundled Factory plugin keeps compatibility ID `factory-team` and combines
-Team preferences, Pragmatic guidance and task/check UI in one feature.
+Team preferences, the Factory skill, native execution and task/check UI in one package.
 Team Auto / Off / Selected appears in normal chat. Use `bb factory team get --json` and `bb factory team set --mode auto|off|selected
 [--profiles '<JSON array>'] [--revision <n>] --json`. Scope defaults to the current
 thread; pass `--thread <id>` or `--project <id>` for an explicit conversation or
 project default. A profile names `providerId`, `model`, `reasoningLevel` and
 optional `serviceTier`. Each provider/model can appear once. Project defaults
 are snapshotted into new threads. This is delegation guidance; explicit task
-instructions override it. See the plugin's `team` skill for details.
+instructions override it. See the Factory skill's Team reference for details. New selections are remembered for new chats unless --local is used; --global inspects the remembered default.
 
-Tasks use `bb factory create|update|start|status|list|verify|assign|cancel|finding|resolve|agent-review|note
+Tasks use `bb factory create|update|start|status|list|verify|assign|cancel|resume|finding|resolve|agent-review|note|approve|deliver|export|import
 --input '<JSON>'`. The `bb_factory` tool uses the same action/input schemas.
 New tasks start as drafts; `start` activates the task without spawning workers.
 A spec can include problem, outcome, proposed team and up to 128 requirements.
@@ -949,7 +949,7 @@ with artifact references. Neither grants human approval.
 `judge` and `judge-many` are UI/CLI only and need explicit human confirmation
 plus the displayed spec version and content fingerprint. Bulk judgment applies
 to the explicitly selected requirements atomically; agents must never fabricate
-approval. The card separates proposed team, actual work and acceptance evidence.
+approval. The card focuses on scope and requirements; native worker progress remains in chat. Delivery approval and current coverage are separate.
 All Factory RPCs, including Team get/set and collectReview, use `factory-team`.
 Use `bb plugin rpc inspect factory-team --json` for registered discoverable schemas.
 The former `bb team` CLI becomes `bb factory team`; saved preferences remain intact.
@@ -960,20 +960,19 @@ Factory review collection
 When Factory guidance is present, `bb factory review collect --input '<JSON>'` collects
 completed independent reviewer outputs. Input contains `passes` with unique
 `id`, `agent`, `role`, `output` and `error` (null for absent output/error), optional
-`sources` with `path`/`content`, and optional raw `judge` JSON text. The matching
-agent tool is `bb_review_collect`; discoverable RPC is `collectReview`.
+`sources` with `path`/`content`, and optional raw `judge` JSON text. The discoverable RPC is `collectReview`; there is no separate model-facing collection tool.
 
 This operation launches no workers. It returns the supplied roster, sorted and
 indexed findings, XML union, quote checks on supplied snapshots, and optional
 validated judge results. An invalid judge retains the raw union as degraded.
 Exit 2 means partial roster or degraded judge; it does not discard good outputs.
 Attribution and snapshot freshness are caller-supplied; collection is not Factory
-task acceptance. See the Pragmatic Orchestration skill for native review plans.
+task acceptance. See the Factory skill for proportionate review.
 
 ## Subscription limits
 
 Provider Usage remains a separate native plugin. `bb usage limits [--force]
-[--json]`, `bb_usage_limits`, and discoverable `provider-usage` RPC `readLimits`
+[--json]` and discoverable `provider-usage` RPC `readLimits`
 return normalized capacity observations with account/pool identity, timestamps
 and stale/unknown states. Supported account fallback is configured in Account
 Pooler; reading a limit does not prove fallback or choose a replacement model.
@@ -993,3 +992,23 @@ Guidance requires a stable guidanceId; exact retries return the durable receipt
 without resending. Wait accepts identity targets with afterCursor and a bounded
 timeoutMs, returning the first new completion and cursors. Neither submission
 nor completion establishes compliance or Factory acceptance.
+
+Factory owns new delegated execution internally; standalone Workflows is optional
+and disabled on fresh installations. `bb factory execution run|validate|status|history|list|stop`
+retains the durable runtime commands. `bb factory execution inspect|guide|guide-status|wait --input <json>`
+uses the discoverable execution schemas on `factory-team`; `guide` takes an
+execution identity, assignmentId, guidanceId, message and `steer`/`followUp` mode for a running assignment. To continue a settled Factory session, create a new assignment with a fresh launchId/id and `continuationThreadId`; preserve its profile, permissions and environment. This reacquires ownership and retains both results.
+`wait` takes `targets` with execution identities and `afterCursor`, plus a bounded
+timeoutMs. Start task assignments with `bb factory assign --input <json>`.
+Existing Workflows runs retain their owner and must settle before disabling its
+plugin. Factory can still inspect settled legacy task results afterward.
+
+`bb factory execution --help` lists run and assignment-control commands together.
+`bb factory execution guide --help` and `bb factory execution wait --help` include
+complete JSON examples, accepted modes, cursor reuse and timeout bounds; these
+commands do not require looking up raw RPC schemas to construct their input.
+
+Factory assignments carry advisory `ownership` (`read-only` or `exclusive`) into
+execution. Omitted legacy ownership is exclusive. Readers may share a canonical
+workspace; writers retain exclusive coordination, and unconfirmed worker stops
+block reuse. This metadata does not change or weaken provider `permissionMode`.

@@ -9,12 +9,12 @@ and isolated concurrent implementers are valid choices.
 | Boundary | Executable evidence |
 | --- | --- |
 | Durable execution identity, environment choice and conservative stop | [Workflows policy tests](../../plugins/workflows/src/service-policy.test.ts), [execution contract tests](../../plugins/workflows/src/execution.test.ts) |
-| Factory → Workflows integration, selected parallel assignments and acceptance | [Native integration test](../../plugins/bbfactory/src/native-integration.test.ts) |
-| Versioned requirements, linked evidence, stale/restart/stop handling and human guards | [Factory service tests](../../plugins/bbfactory/src/service.test.ts) |
-| Real checks, descendant containment and unsupported capture | [Factory host tests](../../plugins/bbfactory/src/host.test.ts) |
-| Task details, uncertainty and human judgment UI | [Task UI tests](../../plugins/bbfactory/src/app.test.tsx) |
-| Existing Team upgrade, composed tools/skills and CLI | [Composition test](../../plugins/factory-team/factory-server.test.ts), [Team tests](../../plugins/factory-team/server.test.ts) |
-| Guidance links/preserved prompts and review collector | [Bundle tests](../../plugins/factory-guidance/bundle.test.ts), [collector tests](../../plugins/factory-guidance/review.test.ts) |
+| Factory → Workflows integration, selected parallel assignments and acceptance | [Native integration test](../../plugins/factory/tasks/native-integration.test.ts) |
+| Versioned requirements, linked evidence, stale/restart/stop handling and human guards | [Factory service tests](../../plugins/factory/tasks/service.test.ts) |
+| Real checks, descendant containment and unsupported capture | [Factory host tests](../../plugins/factory/tasks/host.test.ts) |
+| Task details, uncertainty and human judgment UI | [Task UI tests](../../plugins/factory/tasks/app.test.tsx) |
+| Existing Team upgrade, composed tools/skills and CLI | [Composition test](../../plugins/factory/factory-server.test.ts), [Team tests](../../plugins/factory/team/server.test.ts) |
+| Guidance links/preserved prompts and review collector | [Bundle tests](../../plugins/factory/review/bundle.test.ts), [collector tests](../../plugins/factory/review/review.test.ts) |
 
 Run relevant tests/typechecks with Turbo. Build `bb-plugin-factory-team`'s
 `prepare:bundled` task to verify the composed server, host, UI and staged skills.

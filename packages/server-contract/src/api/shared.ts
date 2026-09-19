@@ -39,8 +39,26 @@ export type ThreadContextWindowUsage = z.infer<
   typeof threadContextWindowUsageSchema
 >;
 
+export const threadConfigurationSnapshotSchema = z.object({
+  capturedAt: z.number(),
+  providerId: z.string(),
+  model: z.string(),
+  source: z.literal("bb-prepared"),
+  instructions: z.string(),
+  skills: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      sourceType: z.string(),
+    }),
+  ),
+  tools: z.array(z.object({ name: z.string(), description: z.string() })),
+  harnessAdditions: z.literal("not-observed"),
+});
+
 export const threadContextResponseSchema = z.object({
   usage: threadContextWindowUsageSchema.nullable(),
+  configuration: threadConfigurationSnapshotSchema.nullable().optional(),
 });
 export type ThreadContextResponse = z.infer<typeof threadContextResponseSchema>;
 

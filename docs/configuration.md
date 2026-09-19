@@ -1561,3 +1561,12 @@ or with `bb settings general telemetryEnabled false`. The saved server-wide pref
 takes effect immediately and persists across restarts. SDK callers can use
 `system.updateGeneralSettings` with `telemetryEnabled`. `BB_TELEMETRY=false`
 always disables telemetry, even when the saved preference is enabled.
+
+## Factory execution
+
+Factory retains plugin/storage ID `factory-team` and includes its own execution
+settings (active runs, agent concurrency, call limits, timeouts and retention).
+Standalone Workflows is disabled by default on fresh installs. Upgrades preserve
+its saved enablement while legacy runs drain; disabling or removing an owner with
+active or unresolved execution is rejected. After confirmed settlement, disable
+Workflows explicitly if it is no longer needed. Neither database is reset.

@@ -22,6 +22,7 @@ import {
 } from "@bb/domain";
 import {
   publicApiRoutes,
+  threadConfigurationSnapshotSchema,
   THREAD_EVENT_LIST_PAGE_SIZE,
   typedRoutes,
   type PublicApiSchema,
@@ -394,7 +395,12 @@ export function registerThreadDataRoutes(app: Hono, deps: AppDeps): void {
       threadId: thread.id,
       sequenceStart,
     });
+    const snapshot = threadConfigurationSnapshotSchema.safeParse(
+      getThreadPluginMetadata(deps.db, thread.id, "bb-agent-context").metadata
+        .snapshot,
+    );
     return context.json({
+      ...(snapshot.success ? { configuration: snapshot.data } : {}),
       usage: extractThreadContextWindowUsage(rows.map(toThreadEventWithMeta)),
     });
   });

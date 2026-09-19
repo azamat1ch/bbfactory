@@ -1,3 +1,4 @@
+import { assertExecutionOwnerSettled } from "./owner-guard.js";
 import {
   executionStartSchema,
   type ExecutionAssignment,
@@ -693,6 +694,7 @@ export function createWorkflowService(
       }
     }
     const created = db.transaction(() => {
+      if (shuttingDown) throw new Error("Execution owner is shutting down; launch was not committed");
       for (const { hostId, rootPath } of Object.values(
         input.executionHosts ?? {},
       )) {
@@ -709,6 +711,7 @@ export function createWorkflowService(
             "Assignment workspace has active or unresolved execution ownership",
           );
       }
+      assertExecutionOwnerSettled(bb.server.experimental_dataDir, "factory-team");
       const created = createRun(
         db,
         {
