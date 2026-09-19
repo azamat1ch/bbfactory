@@ -1,3 +1,13 @@
+# bbfactory
+
+A BB-based workspace for native orchestration across coding agents and existing subscriptions.
+
+**Status:** bootstrap only. BB builds and runs; the orchestration integration is planned, not implemented. Start with the [product entry point](docs/product/README.md) for scope, verified status, and contributor navigation.
+
+Built on [BB](https://github.com/get-bb/bb), with orchestration based on [Pragmatic Orchestration](https://github.com/CodeAlive-AI/pragmatic-orchestration). Upstream history and license notices are preserved. The upstream BB documentation follows; its download links install upstream BB, not a bbfactory release.
+
+---
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/e40bda56-54a4-47f8-a417-6bbadf2e5b40">
@@ -226,6 +236,7 @@ See [System overview](docs/system-overview.md) for runtime architecture, data mo
 
 ## Further Reading
 
+- [Product distribution](docs/product/README.md) — this checkout's distribution intent and status
 - [Vision](docs/VISION.md)
 - [Platform support](docs/platform-support.md)
 - [Configuration](docs/configuration.md)
