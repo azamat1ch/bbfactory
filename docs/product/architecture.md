@@ -25,6 +25,9 @@ into prompts, task records or artifacts.
 
 Use a bundled `bbfactory` plugin/package as the proposed product boundary:
 
+- **Guidance:** a native skill bundle preserves Pragmatic Orchestration's useful
+  instructions, references and review prompts. Adapt commands and incompatible
+  assumptions to BB; load detailed guidance only for the current operation.
 - **Server:** versioned task contracts, profile eligibility, direct/delegate
   decisions, review policy, attempt-to-thread links and acceptance evaluation.
 - **Native execution:** BB threads and Workflows own worker sessions, execution
@@ -101,6 +104,14 @@ bounded observations, delta steering, peer review with distinct findings,
 revision-bound acceptance, diagnosed retries, recovery and preserved handovers.
 Some of these are instructions; others need enforced state transitions. Label
 which is which and test observed behavior, not just prompt presence.
+
+Preserve upstream skill/reference/prompt text nearly verbatim where compatible.
+Use verified native tools and CLI commands in examples; an SDK method is not
+automatically an agent tool. Missing automation must stay explicitly unavailable
+until implemented. The [parity map](parity-map.md) distinguishes preserved
+guidance, native-call substitutions and executable invariants, and records the
+source assets and proposed work packages. This is a behavior map, not evidence
+of implemented coverage.
 
 [coverage.md](coverage.md) preserves 135 upstream source-inventory rows. Map each
 relevant behavior to inherited BB support, adaptation, new implementation or a
