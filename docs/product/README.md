@@ -32,6 +32,18 @@ product:
 Treat every capability above as unimplemented until linked evidence says
 otherwise.
 
+## Specifications and implementation entry
+
+These documents are the canonical product specifications. They describe planned behavior; they are not evidence of implemented features or runnable tests.
+
+1. [Product decisions](decisions.md) — agreed choices and open experiments.
+2. [First implementation slice](first-slice.md) — next deliverable, interfaces, ownership, and proposed behavioral checks.
+3. [Architecture](architecture.md) — verified upstream integration surfaces and proposed runtime design.
+4. [Acceptance criteria](acceptance.md) — independent review and verification gates.
+5. [Upstream coverage inventory](coverage.md) — detailed parity checklist; consult the relevant capability IDs rather than loading the whole inventory into every task.
+
+Read decisions and the first slice before implementation. Follow the architecture and coverage references only as needed. Update these canonical documents when a contract changes; avoid parallel copies in task notes.
+
 ## Contributor Docs (Upstream)
 
 Start here before changing code:
