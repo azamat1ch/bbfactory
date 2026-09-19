@@ -48,6 +48,7 @@
         "$TURBO_ROOT$/CHANGELOG.md",
         "$TURBO_ROOT$/changelog-metadata.ts",
         "$TURBO_ROOT$/changelog-parser.ts",
+        "$TURBO_ROOT$/assets/factory-logo.svg",
         "$TURBO_ROOT$/packages/plugin-api-map/src/anatomy-manifest.json",
         "$TURBO_ROOT$/vitest.shared.ts"
       ]
@@ -93,6 +94,7 @@
         "$TURBO_ROOT$/scripts/build-package.mjs",
         "$TURBO_ROOT$/scripts/build-utils.mjs",
         "$TURBO_ROOT$/scripts/precompress-app-dist.mjs",
+        "$TURBO_ROOT$/assets/factory-logo.svg",
         "$TURBO_ROOT$/turbo.json"
       ],
       "outputs": ["bundle-stats.json", "dist/**"]
@@ -109,6 +111,7 @@
         "$TURBO_ROOT$/scripts/build-package.mjs",
         "$TURBO_ROOT$/scripts/build-utils.mjs",
         "$TURBO_ROOT$/scripts/precompress-app-dist.mjs",
+        "$TURBO_ROOT$/assets/factory-logo.svg",
         "$TURBO_ROOT$/turbo.json"
       ],
       "outputs": ["dist/**"]
@@ -503,6 +506,7 @@
         "$TURBO_ROOT$/scripts/build-package.mjs",
         "$TURBO_ROOT$/scripts/build-utils.mjs",
         "$TURBO_ROOT$/scripts/precompress-app-dist.mjs",
+        "$TURBO_ROOT$/assets/factory-logo.svg",
         "$TURBO_ROOT$/turbo.json"
       ],
       "outputs": ["dist/**"]
