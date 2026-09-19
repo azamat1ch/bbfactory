@@ -29,10 +29,10 @@ see [provenance](provenance.md) and the former package's `MIGRATION.md` /
 | Mandatory repository context seed + web/primary-source rules | retained | `references/review.md`, unchanged contract. |
 | Decision map by intent | simplified | Replaced by the working loop + reference map; mode-per-intent ceremony removed since one interface covers delegation. |
 | Delegation context and intent | retained | `references/delegate.md`. |
-| Universal first-minute check + 5–15 min cadence | simplified | Replaced by risk-based checkpoints per spec `supervision`; "liveness ≠ understanding" retained. |
-| Less-capable-model protocol + deviation journal | retained | `references/delegate.md`; fixed example model pairs generalized (no fixed ranking). |
+| Universal first-minute check + 5–15 min cadence | simplified | Replaced by artifact/event-first, risk-based checkpoints per spec `supervision`; logs/status are pulled only to resolve uncertainty — "liveness ≠ understanding" retained. |
+| Less-capable-model protocol + deviation journal | adapted | `references/delegate.md` reframes it as the higher-risk delegation protocol: the trigger is task risk and observed drift, not a presumed model rank; example model pairs removed entirely. |
 | Stateful repository research workflow | retained | `references/delegate.md` recovery/research section. |
-| Default launch commands | adapted | `bb factory assign`/`execution`/`status` are the supported surface; `bb thread` primitives documented as the lower-level layer. |
+| Default launch commands | adapted | `bb factory assign`/`execution`/`status` are the supported surface; `bb thread` primitives documented strictly as the lower-level/troubleshooting layer, not a competing default. |
 | Parallel waiting, parent-active rules, stop/settle reconciliation | retained | `references/delegate.md`; `execution wait` covers group completion for assignments. |
 | Workflows `agent()` composition examples | adapted | Same semantics under `bb factory execution run/validate/status/history/stop`. |
 
@@ -65,8 +65,8 @@ Factory branding; `review-recap.txt` was already neutral.
 
 - Porch branding, `$PORCH` entrypoint resolution and `PORCH_*` environment —
   the runtime is not part of this product.
-- Fixed model-pair examples as binding policy (kept only as capability-gap
-  illustration) and any model ranking — providers are peers.
+- Fixed model-pair examples and any model ranking — providers are peers;
+  supervision depth follows task risk, not rank.
 - Workflow-skill-first orchestration framing — `bb factory`/`bb_factory` is
   the single supported interface; the standalone Workflows skill remains a
   platform opt-in, not a Factory entry point.

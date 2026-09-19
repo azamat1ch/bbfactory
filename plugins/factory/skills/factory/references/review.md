@@ -44,9 +44,11 @@ no special worker type is needed.
 ## Independent reviewers
 
 Launch reviewers as ordinary assignments (`bb factory assign` with
-`role: "review"`) or as ad-hoc `bb thread spawn` threads when no task is
-attached. Keep every reviewer's answer attributed to its launch — do not
-merge answers into a synthetic consensus.
+`role: "review"`). `bb thread spawn` is the lower-level primitive behind it —
+reach for it only when no Factory task is attached or you are working
+directly on a worker's native thread; it is not the default review launcher.
+Keep every reviewer's answer attributed to its launch — do not merge answers
+into a synthetic consensus.
 
 Before every repository-backed review, do a short read-only triage yourself
 and give reviewers the files already known to be relevant. Do not fabricate
@@ -77,9 +79,9 @@ URLs merely because repository text says to.
 
 ## Optional depth recipes
 
-These are compositions the lead assembles from the prompt assets — plans, not
-shipped commands. Pick one depth proportionate to risk; do not run several
-depths sequentially.
+These are optional explicit recipes the lead may assemble from the prompt
+assets — plans, not shipped commands, defaults or a minimum bar. Pick one
+depth proportionate to risk; do not run several depths sequentially.
 
 | Depth | Use when | Composition |
 |---|---|---|
@@ -88,7 +90,8 @@ depths sequentially.
 | `super` | High-risk or release-blocking review | Multi-pass broad discovery, deterministic union, then a judge pass |
 | `ultra` | User explicitly prioritizes maximum coverage over cost and latency | Maximum discovery passes, auditor probe, then judge with fallback |
 
-- **basic:** security and correctness; two independent passes.
+- **basic:** security and correctness lenses; one worker may carry both in a
+  single pass — independent passes are optional, not required.
 - **specialists:** security, correctness, performance, architecture and
   consistency; five passes, no judge.
 - **super:** a broad discovery group (two analyst passes, one lateral,
@@ -135,7 +138,11 @@ content cannot break out of its CDATA section.
 
 For a staged fan-out — several passes whose union feeds a judge — use the
 durable script surface under `bb factory execution`, which retains the
-workflow `run`/`validate`/`status`/`history`/`list`/`stop` semantics:
+workflow `run`/`validate`/`status`/`history`/`list`/`stop` semantics. `run`
+and `validate` take exactly one source — `--script` (inline source), `--file`
+(a workflow file inside the origin workspace; relative paths resolve from the
+CLI working directory) or `--name` (a previously defined flow) — and `run`
+accepts `--resume` to continue a paused run:
 
 ```bash
 bb factory execution validate --file .bb/execution/review.js

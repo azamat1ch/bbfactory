@@ -17,9 +17,10 @@ untrusted text into the command itself.
 
 Actions: `create`, `update`, `status`, `list`, `verify`, `assign`, `cancel`,
 `finding`, `resolve`, `start`, `agent-review`, `note`. Read the exposed
-schema before supplying fields. `judge` and `judge-many` are UI/CLI-only
-human attestations, never agent actions. A minimal direct-work specification
-is:
+schema before supplying fields. `approve`, `deliver`, `judge`, `judge-many`,
+`resume`, `export` and `import` are UI/CLI-only — human attestations and
+delivery records are never agent actions. A minimal direct-work
+specification is:
 
 ```json
 {
@@ -51,14 +52,30 @@ takes `{ "threadId": "<id>" }`. An `update` includes `expectedVersion`, the
 complete spec and `changeReason`; changed requirements or checks require
 fresh evidence.
 
+Each requirement carries a `criterion` (`automated`, `agent` or `human`) or a
+`verificationMethods` list. An empty list means the legacy `criterion`
+applies; a non-empty list requires **every** listed method — an `automated`
+route can be planned via `reviewInstructions` before its executable check
+exists. Define the exact combination semantics while refining the draft.
+
 Human criteria use `judge` with `requirementId`, `accepted`, `actor`,
 `rationale`, `humanConfirmed: true`, and the `expectedVersion` and
 `expectedFingerprint` shown for the current task; `judge-many` applies one
-attestation to an explicit `requirementIds` list. Changed content or
-specification rejects the judgment. Never invent human approval. A
-successful worker or review judge is not acceptance: recheck final
-integrated content — stale, failed, unmapped and unknown requirements stay
-visible.
+attestation to an explicit `requirementIds` list. `approve` records a
+delivery-level or selected-requirement approval: `scope` `delivery`
+snapshots all requirement ids (empty list), `scope` `selected` takes an
+explicit unique non-empty `requirementIds` list — plus `accepted`, `actor`,
+`source` (`ui`, `cli` or `chat`), `sourceRef` and `rationale`. A decision
+given in chat must carry `source: "chat"` with its `sourceRef` so the record
+is attributable. `deliver` records an immutable delivered snapshot with an
+optional `mergeUrl`; it does not imply approval or passing checks.
+`resume` clears a legacy stop only after native settlement and launches
+nothing; `export`/`import` move a spec between tasks — an import starts as a
+fresh draft with no evidence or approvals, keeping only historical
+provenance. Changed content or specification rejects stale judgments and
+approvals. Never invent human approval. A successful worker or review judge
+is not acceptance: recheck final integrated content — stale, failed,
+unmapped and unknown requirements stay visible.
 
 ## Assignments and supervision
 
@@ -112,9 +129,11 @@ task-level action and is a different operation.
 
 Task cancellation requests stop: `cancel` takes `taskId` and `archive`,
 records durable stop intent, aborts running checks and requests native
-cancellation. A settled thread is not proof that detached provider-side
-processes stopped; block overlapping replacement writers while ownership
-remains uncertain.
+cancellation — it is rejected when no execution is running (`executionRunning`
+on the task view), except for archive lifecycle cleanup. Stopping alone does
+not invalidate matching evidence. A settled thread is not proof that detached
+provider-side processes stopped; block overlapping replacement writers while
+ownership remains uncertain.
 
 ## Review processing
 
@@ -184,6 +203,8 @@ Use `note` to preserve compact decisions, blockers, deviations and
 conclusions, with artifact references. Keep proposed `teamPlan` rows distinct
 from actual assignments. After integration, rerun relevant checks on final
 content and reconcile review findings. Offer a short human review guide only
-for the items that need it. Never submit human judgment on the user's behalf
-without their explicit attestation of the current result; spec approval is
-not result approval.
+for the items that need it; the user can approve the delivery or an explicit
+selected set through `approve` (or `judge-many`), and a decision stated in
+chat is recorded with its `sourceRef` rather than re-entered. Never submit
+human judgment on the user's behalf without their explicit attestation of the
+current result; spec approval is not result approval.

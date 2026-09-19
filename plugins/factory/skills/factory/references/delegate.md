@@ -11,7 +11,7 @@ is addressable by id until archived or deleted.
 - Keeping the lead turn active
 - Context and intent
 - Risk-based supervision
-- Delegating to a less capable model
+- Higher-risk delegation protocol
 - Steering modes and delivery semantics per provider
 - Continuation, retries and handover
 - Inspecting effective context
@@ -66,8 +66,10 @@ bb factory assign --input "$(cat launch.json)"
   provider fails the assignment rather than silently substituting another
   model.
 
-For ad-hoc threads not attached to a Factory task — a quick second opinion, a
-read-only investigation — `bb thread spawn` is the same underlying primitive:
+Factory assignments are the supported delegation path. `bb thread spawn`
+remains the lower-level primitive underneath — use it only for threads that
+do not belong to a Factory task (a quick one-off question, or direct work on
+a worker's native thread while troubleshooting):
 
 ```bash
 bb thread spawn --project "$BB_PROJECT_ID" --parent-self \
@@ -197,21 +199,26 @@ live or running status only proves liveness, never understanding or progress;
 if substantive evidence is not yet available, retain that uncertainty and set
 a concrete near-term recheck.
 
-At each checkpoint:
+At each checkpoint, prefer the lightest sufficient evidence:
 
-1. Read `bb thread log <id> --format json --limit 50`; on later checks pass
-   the saved last `seq` as `--after-seq` for an incremental page. Compare the
-   worker's actual actions and findings against the task, constraints and
-   anticipated pitfalls. Liveness alone does not satisfy the check, and an
-   empty page only means no events were recorded in that interval.
-2. If evidence shows a wrong direction, an important omission, a
+1. Look at artifacts and events first — `bb factory status` /
+   `bb factory execution inspect` for recorded progress and results, plus
+   diffs and produced files. Compare what the worker actually did against the
+   task, constraints and anticipated pitfalls. Liveness alone does not
+   satisfy the check.
+2. Open `bb thread log <id> --format json --limit 50` only when the artifacts
+   leave uncertainty — an unclear direction, a suspected blocker, a steer
+   whose effect is unverified. On later reads pass the saved last `seq` as
+   `--after-seq` for an incremental page; an empty page only means no events
+   were recorded in that interval.
+3. If evidence shows a wrong direction, an important omission, a
    misunderstanding, or a blocker you can resolve, send one concrete,
    self-contained correction — `bb factory execution guide` for an assignment,
    `bb thread tell <id> --mode auto --message-file steer.md` for an ad-hoc
    thread: the evidence, the required adjustment, the constraints that still
    apply and the remaining work. Keep any required deviation journal path in
    the guidance.
-3. If work is on track, let it continue without a gratuitous steer. Delivery
+4. If work is on track, let it continue without a gratuitous steer. Delivery
    is asynchronous — check `bb thread show <id> --json` once, then verify the
    effect through later events and task artifacts; do not resend merely
    because a steer has not visibly taken effect.
@@ -234,16 +241,15 @@ handed off, include the thread id, launch time, current findings or blocker,
 log sequence cursor, task contract and pending guidance needed to continue
 without repeating work.
 
-## Delegating to a less capable model
+## Higher-risk delegation protocol
 
-The lead owns task design and final verification. Before every delegated
-launch, assess the capability gap for this task; when delegating to a less
-capable model, assume it may miss details or introduce unrequested changes.
-User-designated example pairs include a stronger lead delegating to a weaker
-worker (for example a frontier model delegating to a smaller sibling). For
-other pairs, assess the gap for the task; if uncertain, apply the same
-discipline without claiming a rank. Do not infer capability from price or
-provider name alone.
+The lead owns task design and final verification. Apply this fuller
+discipline when the task carries real risk of missed requirements or silent
+drift — subtle acceptance criteria, a wide blast radius, an unfamiliar
+subsystem, or a worker that has already shown it misses details. The trigger
+is task risk, not a presumed model hierarchy: do not infer capability from
+price, provider name or a fixed ranking; if a gap is uncertain, apply the
+discipline without claiming one.
 
 1. **Write a precise task contract.** Inspect the relevant code first. Give
    the worker the exact working root, intended behavior, scope and non-goals,
