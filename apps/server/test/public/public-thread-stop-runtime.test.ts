@@ -270,7 +270,7 @@ describe("thread runtime stop", () => {
         errorMessage: "Test interrupt failure",
       });
 
-      expect((await responsePromise).status).toBe(200);
+      expect((await responsePromise).status).toBeGreaterThanOrEqual(400);
       expect(getThread(harness.db, thread.id)?.status).toBe("stopping");
       expect(
         listEvents(harness.db, { threadId: thread.id }).find(
@@ -486,56 +486,66 @@ describe("thread runtime stop", () => {
     });
   });
 
-  it("rejects a caller that requires a stopped thread when the escalated interrupt fails", async () => {
-    await withTestHarness(async (harness) => {
-      const { environment, thread } = seedThreadFixture(harness, {
-        thread: { status: "idle", visibility: "hidden" },
-      });
-      seedTurnStarted(harness.deps, {
-        environmentId: environment.id,
-        providerThreadId: "provider-retained",
-        threadId: thread.id,
-        turnId: "turn-retained",
-      });
+  it.each(["internal", "public"])(
+    "rejects %s stop when the escalated interrupt fails",
+    async (surface) => {
+      await withTestHarness(async (harness) => {
+        const { environment, thread } = seedThreadFixture(harness, {
+          thread: { status: "idle", visibility: "hidden" },
+        });
+        seedTurnStarted(harness.deps, {
+          environmentId: environment.id,
+          providerThreadId: "provider-retained",
+          threadId: thread.id,
+          turnId: "turn-retained",
+        });
 
-      const stopPromise = stopThreadForCurrentState(
-        harness.deps,
-        thread,
-        environment,
-        { requireStopped: true },
-      );
-      const settled = stopPromise.then(
-        () => ({ ok: true as const }),
-        (error: unknown) => ({ ok: false as const, error }),
-      );
-      const release = await waitForQueuedCommand(
-        harness,
-        ({ command }) =>
-          command.type === "thread.stop" &&
-          command.threadId === thread.id &&
-          command.intent === "release",
-      );
-      await reportQueuedCommandSuccess(harness, release, {
-        providerCheckpointId: null,
-        activeTurnRetained: true,
-      });
-      const interrupt = await waitForQueuedCommand(
-        harness,
-        ({ command }) =>
-          command.type === "thread.stop" &&
-          command.threadId === thread.id &&
-          command.intent === "interrupt",
-      );
-      await reportQueuedCommandError(harness, interrupt, {
-        errorCode: "test_interrupt_failure",
-        errorMessage: "Test interrupt failure",
-      });
+        const stopPromise =
+          surface === "public"
+            ? Promise.resolve(harness.app
+                .request(`/api/v1/threads/${thread.id}/stop`, {
+                  method: "POST",
+                }))
+                .then((response) => {
+                  if (response.status >= 400)
+                    throw new Error("Public stop rejected");
+                })
+            : stopThreadForCurrentState(harness.deps, thread, environment, {
+                requireStopped: true,
+              });
+        const settled = stopPromise.then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
+        const release = await waitForQueuedCommand(
+          harness,
+          ({ command }) =>
+            command.type === "thread.stop" &&
+            command.threadId === thread.id &&
+            command.intent === "release",
+        );
+        await reportQueuedCommandSuccess(harness, release, {
+          providerCheckpointId: null,
+          activeTurnRetained: true,
+        });
+        const interrupt = await waitForQueuedCommand(
+          harness,
+          ({ command }) =>
+            command.type === "thread.stop" &&
+            command.threadId === thread.id &&
+            command.intent === "interrupt",
+        );
+        await reportQueuedCommandError(harness, interrupt, {
+          errorCode: "test_interrupt_failure",
+          errorMessage: "Test interrupt failure",
+        });
 
-      const outcome = await settled;
-      expect(outcome.ok).toBe(false);
-      expect(getThread(harness.db, thread.id)?.status).toBe("stopping");
-    });
-  });
+        const outcome = await settled;
+        expect(outcome.ok).toBe(false);
+        expect(getThread(harness.db, thread.id)?.status).toBe("stopping");
+      });
+    },
+  );
 
   it("keeps background work running after a retained release and failed interrupt", async () => {
     await withTestHarness(async (harness) => {
@@ -1143,7 +1153,7 @@ describe("thread runtime stop", () => {
     });
   });
 
-  it("reports success when the release cannot reach a disconnected host", async () => {
+  it("reports uncertainty when the release cannot reach a disconnected host", async () => {
     await withTestHarness(async (harness) => {
       const host = seedHost(harness.deps, { id: "host-release-offline" });
       const { project } = seedProjectWithSource(harness.deps, {
@@ -1165,8 +1175,7 @@ describe("thread runtime stop", () => {
         { method: "POST" },
       );
 
-      expect(response.status).toBe(200);
-      await expect(readJson(response)).resolves.toEqual({ ok: true });
+      expect(response.status).toBeGreaterThanOrEqual(400);
       expect(getThread(harness.db, thread.id)?.status).toBe("idle");
     });
   });

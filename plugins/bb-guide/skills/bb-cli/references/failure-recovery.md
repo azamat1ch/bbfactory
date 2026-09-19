@@ -46,3 +46,7 @@ sendAt?, reason? })`.
 - Use `bb thread cancel-plan <id>` to exit an active Plan turn without
   optimistically clearing its banner. Use `bb thread clear-goal <id>` to clear
   a thread's durable active Goal when supported by its provider. Both wait for provider confirmation.
+
+A native stop now returns failure when interruption or host acknowledgement fails.
+Do not replace an uncertain worker. Successful stop concerns the native thread;
+it does not prove detached processes stopped.

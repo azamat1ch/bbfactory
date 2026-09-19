@@ -371,7 +371,9 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
       db: deps.db,
       thread,
     });
-    await stopThreadForCurrentState(deps, thread, environment);
+    await stopThreadForCurrentState(deps, thread, environment, {
+      requireStopped: true,
+    });
     return context.json({ ok: true });
   });
 
