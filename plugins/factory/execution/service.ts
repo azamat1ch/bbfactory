@@ -694,6 +694,7 @@ export function createWorkflowService(
       }
     }
     const created = db.transaction(() => {
+      if (shuttingDown) throw new Error("Execution owner is shutting down; launch was not committed");
       for (const { hostId, rootPath } of Object.values(
         input.executionHosts ?? {},
       )) {
