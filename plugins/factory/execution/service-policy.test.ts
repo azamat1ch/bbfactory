@@ -314,14 +314,13 @@ describe("workflow service policy integration", () => {
       },
     });
     harnesses.push(harness);
-    await plugin(bb);
+    bb.storage.migrate(bb.storage.database(), migrations);
+    const registered = await plugin(bb);
     expect(harness.registrations.settingsDescriptors).not.toEqual({});
 
-    const first = JSON.parse(
-      (await harness.callAgentTool("bb_workflow_run", {
-        script: source("return null;", "settings-one"),
-      })) as string,
-    ) as { runId: string };
+    const first = { runId: (await registered.service.start({
+      projectId: "project-test", originThreadId: "thread-test", source: source("return null;", "settings-one"), args: null, resumedFromRunId: null,
+    })).id };
     const next = {
       maxActiveRuns: 2,
       maxConcurrentAgents: 4,
@@ -331,11 +330,9 @@ describe("workflow service policy integration", () => {
       maxNotificationBytes: 4096,
     };
     await harness.setSettings(next);
-    const second = JSON.parse(
-      (await harness.callAgentTool("bb_workflow_run", {
-        script: source("return null;", "settings-two"),
-      })) as string,
-    ) as { runId: string };
+    const second = { runId: (await registered.service.start({
+      projectId: "project-test", originThreadId: "thread-test", source: source("return null;", "settings-two"), args: null, resumedFromRunId: null,
+    })).id };
 
     const cliContext = {
       threadId: "thread-test",
