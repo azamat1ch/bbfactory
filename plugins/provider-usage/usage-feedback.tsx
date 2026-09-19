@@ -11,7 +11,10 @@ export const usageFeedbackMessages = {
 } as const;
 
 export function hasReportedUsage(providers: readonly UsageProvider[]): boolean {
-  return providers.some((provider) => provider.usage !== null);
+  return providers.some(
+    (provider) =>
+      provider.usage !== null && provider.usage.status !== "unsupported",
+  );
 }
 
 export function emptyUsageMessage(machine: UsageMachine): string {
@@ -22,9 +25,15 @@ export function emptyUsageMessage(machine: UsageMachine): string {
 
 export function offlineUsageMessage(
   machine: UsageMachine,
-  hasUsage: boolean,
+  providers: readonly UsageProvider[],
 ): string {
-  return hasUsage
+  if (
+    providers.length > 0 &&
+    providers.every((provider) => provider.usage?.status === "unsupported")
+  ) {
+    return `${machine.displayName} is offline.`;
+  }
+  return hasReportedUsage(providers)
     ? `${machine.displayName} is offline. Showing the last available update.`
     : `${machine.displayName} is offline. Usage will refresh when it reconnects.`;
 }

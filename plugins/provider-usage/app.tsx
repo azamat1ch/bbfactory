@@ -406,7 +406,7 @@ export function ProviderUsageStatusContent({
           ? usageFeedbackMessages.loading
           : usageFeedbackMessages.noSources
       : activeMachine.status === "disconnected"
-        ? offlineUsageMessage(activeMachine, hasActiveUsage)
+        ? offlineUsageMessage(activeMachine, activeAccounts)
         : snapshot.error !== null || activeMachine.error !== null
           ? hasActiveUsage
             ? usageFeedbackMessages.refreshFailed

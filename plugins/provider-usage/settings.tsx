@@ -395,7 +395,7 @@ export function UsageSettingsContent({
   }
   const notice =
     selected?.status === "disconnected"
-      ? offlineUsageMessage(selected, hasReportedUsage(selected.providers))
+      ? offlineUsageMessage(selected, selected.providers)
       : error || selected?.error
         ? hasReportedUsage(selected?.providers ?? [])
           ? usageFeedbackMessages.refreshFailed
