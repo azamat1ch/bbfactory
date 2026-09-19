@@ -23,7 +23,9 @@ behavior and an honest account of what remains unresolved.
   separate conversations.
 - Workers: interchangeable eligible profiles. Codex, Claude Code, Cursor,
   Devin, OpenCode and GLM/Z.ai are targets. Sol and Devin are peers and may
-  cross-review; no built-in quality hierarchy between them.
+  cross-review; no built-in quality hierarchy between them. Implementation,
+  review and research are assignments to the same native subagent mechanism.
+  A task may have several implementers; there is no one-worker product limit.
 - Team control: Auto, Off and Selected in normal chat. Auto considers coordination
   cost; Off prefers direct work; Selected limits eligible implementer models,
   not worker count. Explicit task instructions override the saved preference.
@@ -74,12 +76,18 @@ A retry needs a diagnosis or new information. Silence alone does not prove a
 worker is stuck. Concurrency follows independent scopes, review capacity and
 actual resource limits, not the number of agents available.
 
-Start with transparent rules and optional user preferences. Candidate policies
-are Conserve premium, Balanced and Finish fastest; each must satisfy the same
-quality requirements. No numeric quota/spending threshold or automatic paid
-fallback has been agreed. Reserves are best-effort when telemetry is delayed or
-shared with activity outside bbfactory. Do not invent remaining-token budgets
-from incompatible provider units or count the same pool twice.
+Worktrees are optional. The lead, worker or workflow may choose checkout reuse,
+separate worktrees or another supported environment. Read-only work can share
+an environment; concurrent writes need coordinated scopes or isolation. A
+preference for a shared checkout does not establish that competing writes are
+safe. Record the chosen environment and ownership with the assignment.
+
+The lead chooses suitable models from the configured team and can inspect
+subscription limits when useful. Preserve one capacity view and supported
+Account Pooler fallback. An automatic quota optimizer, premium-reserve policy
+and Conserve/Balanced/Fastest allocation modes are not required. No automatic
+paid fallback is agreed. Do not invent remaining-token budgets from incompatible
+provider units or count the same pool twice.
 
 ## Specifications and drift
 
@@ -90,6 +98,13 @@ Keep the chain small:
 Given/When/Then is a useful way to describe behavior. It becomes executable only
 when a real automated check exercises it. Use the project's existing tooling;
 Gherkin and a dedicated BDD framework are optional.
+
+This is a capability of the Factory plugin, with compact requirement/check UI,
+not a separate test runner. Each check names the requirements it exercises;
+the lead or a worker writes or links the actual project test. Requirements
+without a matching check remain unverified unless an explicit human-review
+criterion applies. A passing command alone does not establish requirement
+coverage or test quality.
 
 For example: given one remaining event place, when two users book concurrently,
 then exactly one booking succeeds and the other follows the agreed waitlist

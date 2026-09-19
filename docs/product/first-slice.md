@@ -1,69 +1,58 @@
-# First implementation slice
+# Next implementation slice
 
-Status: next implementation contract. Scenarios below are not runnable tests yet.
+Status: revised plan after reassessing draft PR #6 against native BB/Workflows.
+The old one-worker slice is not a product restriction. Follow the recommended
+[ownership boundary](architecture.md) before extending its implementation.
 
-**Deliver one specified task through native BB execution and prove the result.**
-Keep the selected lead in normal chat. It can work directly or delegate to one
-eligible native worker. Show progress, resulting changes and an independently
-run acceptance check. Keep worker completion separate from task acceptance.
+## Prove native execution integration first
 
-## Before parallel implementation
+Add the smallest typed Workflows interface over its existing service, per-call
+native environment/access selection, and truthful native stop/replace handling.
+Factory keeps task/assignment associations and acceptance, not a second scheduler.
 
-Inspect the Workflows/threads integration seam and define shared contracts. Reuse
-native durability; do not assume an undocumented cross-plugin service exists.
-Choose the small native extension needed if the exposed SDK is insufficient.
+Build an offline fake-provider integration scenario that exercises:
 
-- Task: stable ID, goal, scope, spec version, requirement IDs and agreed checks.
-- Attempt: launch intent, direct/delegate mode, profile, origin thread, native
-  worker/workflow identifiers, resolved host/workspace, base revision and state.
-- Evidence: check definition/argv, spec version, content identity including new
-  files, relevant environment, exit status, timing and log references.
-- State/UI: explicit running, blocked, awaiting checks, accepted, failed and
-  cancelled states. Native completion and product acceptance are separate fields.
-
-Use the actual BB identifiers and provider capabilities. Do not put Porch IDs,
-CLI exit codes or mandatory Devin-specific fields in the product contract.
-The first slice has one writer per workspace, including the direct lead route.
-
-## Work lanes
-
-1. Contract/integration owner defines the records, integration seam and fixture
-   conventions. Other lanes start once this small interface is stable.
-2. Server lane implements tasks, native attempt linkage, reconciliation and
-   acceptance transitions. It does not duplicate the execution scheduler.
-3. Host verification lane captures tested content and executes declared checks
-   on the correct host/workspace independently of the implementing worker.
-4. UI lane builds one task card from the agreed records, with progress, evidence
-   and access to the native worker thread. Shared actions also reach the CLI/tool.
-5. Integrate and exercise the real path. An independent Astra reviews the
-   result and failure evidence. Implementers/reviewers are eligible peers.
-
-Give each writer a separate branch/worktree and bounded files. Tests target
-failure modes and observable outcomes, not assertions that mirror implementation.
-
-## Behavioral checks to implement
-
-| Scenario | Expected result |
+| Situation | Expected result |
 | --- | --- |
-| A selected configured provider receives one bounded task | A real native worker runs, is observable and returns artifacts; provider-specific capabilities are accurately shown |
-| Worker says done but the required check fails | Worker completion is recorded; task remains unaccepted with the failure evidence |
-| Required check passes on the captured resulting content | Task can be accepted only for that spec/content/check version |
-| Files, new files, agreed checks or relevant spec change after a pass | Affected evidence becomes stale and acceptance is withdrawn pending verification |
-| Lead works directly | No worker is required; the same ownership and verification gate applies |
-| Spawn response is lost or app/plugin restarts | Reconcile persisted native ownership; never blindly launch another writer |
-| Cancel request is acknowledged but stop is uncertain | Show pending cancellation; no replacement writer until terminal confirmation |
-| A completion notification arrives twice | One product transition; no duplicate integration/check launch caused by replay |
-| UI reconnects | Restore the same task from durable state, not model-generated status text |
+| Lead delegates two bounded assignments | Ordinary native subagents use selected profiles and expose native progress |
+| Review/research shares a checkout | Sharing works with the chosen access policy; no mandatory worktree |
+| Two implementers write concurrently | Coordinated scopes/environments prevent competing writes; worktrees are one option |
+| Spawn reply is lost, then the plugin restarts | Reconcile durable native ownership; never blindly launch a duplicate |
+| Stop acknowledgement fails, then retry is requested | Preserve partial work and uncertainty; no overlapping replacement writer |
+| One parallel call fails | Preserve its attributed failure; a null result is not successful delivery |
 
-Use deterministic fakes for lifecycle failures and real checks on a fixture repo.
-For native smoke, use a working authenticated profile and then repeat with a
-second profile/harness as available; record precisely which were tested. Devin
-is one integration candidate, not the architecture's mandatory starting point.
+These are tests to build, not claims of passing behavior. Thread settlement
+must not be confused with a stronger process/write guarantee.
 
-## Next slices
+## Connect the product
 
-After the single-task path works: peer cross-review, isolated parallel workers
-and handover; pool-aware capacity and routing; richer spec refinement/drift
-controls; both chat/dashboard layouts; measured efficiency and packaging. Keep
-those requirements in the [specification](spec.md) while landing small usable
-increments. No additional high-level product workshop is needed to start.
+After proving the boundary, integrate bounded work in these lanes:
+
+1. **Guidance and Team.** Finish adapted Pragmatic guidance and consume the
+   existing Team record for actual assignments. Preserve direct work, chosen
+   models, explicit overrides and concise contextual briefs.
+2. **Requirements and evidence.** Extend retained PR #6 records with explicit
+   requirement/check links and review findings. Correct host verification
+   defects and check final integrated content.
+3. **Compact UI.** Reuse the Team picker and task/check card. UI, tools and CLI
+   read the same records; do not add another dashboard.
+4. **Real app proof.** Complete a requested feature through the app, including
+   implementation, review, correction and independent verification. A canned
+   delivery fixture does not substitute for building the demonstration in-app.
+
+Acceptance examples:
+
+- Direct and delegated work use the same acceptance checks; direct work does
+  not need ceremonial extra agents or a workflow.
+- A required behavior without a linked check stays unverified unless an
+  explicit human-review criterion applies.
+- Worker completion plus a failing required check leaves the task unaccepted.
+- Changed requirements, checks or relevant files invalidate affected evidence.
+- Research, review and implementation use the same subagent mechanism;
+  unresolved required review findings block acceptance.
+- Reconnect/restart restores durable records, not model-written status text.
+
+Continue the [Pragmatic parity map](parity-map.md), including deeper review plans,
+supervision, context/session handling and recovery. Keep limits inspectable and
+configure supported account pooling. There is no quota-optimizer milestone.
+Branding, package consolidation and fresh-setup verification complete the experience.

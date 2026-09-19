@@ -1,125 +1,121 @@
 # Native BB architecture
 
-Status: implementation direction based on inspected source. No bbfactory runtime
-has been built. This replaces the earlier mandatory Porch-wrapper design.
-Source pins and attribution are in [provenance](provenance.md).
+Status: implementation recommendation after source reassessment on 2026-09-19.
+Team preferences and Devin quota support are on main. Guidance is not integrated.
+Draft [PR #6](https://github.com/azamat1ch/bbfactory/pull/6) has task/check runtime
+and UI, but failed independent acceptance. Reassess its execution design before
+integration. Source attribution remains in [provenance](provenance.md).
 
-## Reuse first
+## Clear ownership
 
-| Concern | Existing BB surface | bbfactory responsibility |
-| --- | --- | --- |
-| Agent execution | [provider plugins](../provider-plugin-api.md), native SDK threads | Choose eligible profiles; fill provider gaps through provider integration |
-| Durable orchestration | [Workflows](../../plugins/workflows/README.md): SQLite runs/calls, replay, bounded retries, native worker threads, stop and progress UI | Bind execution to task contracts; avoid a second retry scheduler |
-| Conversation | Normal lead thread and [composer extensions](../../examples/plugins/composer-customization/README.md) | Lead/team/execution controls, meaningful task cards and decisions |
-| Usage | [Provider Usage](../../plugins/provider-usage/README.md) | Capacity freshness, shared-pool policy, routing reasons and total-run accounting |
-| Account switching | [Account Pooler](../../plugins/account-pool/PLUGIN_OVERVIEW.md), experimental Codex/Claude support | Expose supported rotation accurately; never infer universal provider support |
-| Workspaces | Existing environment/worktree and host routing | Assign exclusive write scope; integrate isolated work when parallelism is justified |
-| Tools and UI | Plugin server/app/host entries, SDK, CLI and realtime surfaces | A bundled product experience with consistent state on every surface |
+Present one Factory feature. The recommended final package boundaries are:
 
-Workflows is opt-in in upstream BB. bbfactory must deliberately configure its
-required capabilities; documentation does not enable them. Provider auth and
-account services remain native. The orchestration layer must not copy tokens
-into prompts, task records or artifacts.
+| Owner | Responsibility |
+| --- | --- |
+| Factory plugin | Team preferences/picker, adapted Pragmatic guidance and review prompts, task/spec records, native-run associations, review findings, requirement-linked checks, acceptance and compact UI |
+| Native Workflows and BB threads | Execute ordinary subagents; own scheduling, progress, sessions, transport, execution retries, cancellation and recovery |
+| Native environment providers | Reuse checkouts or create/remove worktrees and other supported environments |
+| Provider plugins, Provider Usage and Account Pooler | Provider execution/auth, actual quota observations and supported account fallback |
 
-## Ownership
+The lead decides how to work using guidance and Team preferences. Implementation,
+review and research are assignments to the same agents. Direct lead execution
+needs no workflow. For Factory-managed delegated work, extend Workflows as the
+execution owner rather than maintain another generic worker lifecycle in Factory.
 
-Use a bundled `bbfactory` plugin/package as the proposed product boundary:
+The current `factory-team`, `factory-guidance` and draft `bbfactory` packages are
+development boundaries. First integrate through real contracts. Then consolidate
+Team and guidance into Factory with preference migration and CLI compatibility;
+preserve the implemented picker. Users should not need three independent toggles
+to assemble the feature. Workflows remains a reusable native plugin underneath.
 
-- **Guidance:** a native skill bundle preserves Pragmatic Orchestration's useful
-  instructions, references and review prompts. Adapt commands and incompatible
-  assumptions to BB; load detailed guidance only for the current operation.
-- **Server:** versioned task contracts, profile eligibility, direct/delegate
-  decisions, review policy, attempt-to-thread links and acceptance evaluation.
-- **Native execution:** BB threads and Workflows own worker sessions, execution
-  state, transport and applicable retries. Reuse their lifecycle rather than
-  launching a parallel Porch process tree.
-- **Host:** resolve the actual environment, collect immutable resulting content
-  and run declared checks independently of worker claims. Every action carries
-  the stored host/workspace identity. Add only primitives missing from BB.
-- **App:** composer controls, task/evidence cards and dashboard. Read server
-  records; model-written prose cannot manufacture successful check state.
+## Existing native capabilities and gaps
 
-This is not yet a public API contract. Workflows is not assumed to expose a
-cross-plugin scheduling service just because it has a CLI and agent tool.
-Establish the smallest supported integration seam before coding dependent
-lanes. If a seam is missing, extend or extract that native boundary under BB's
-experimental SDK rules. Do not make a second scheduler to avoid this decision.
-All end-user actions need UI, SDK/tool and CLI access; `bb factory` is a proposed
-namespace, not an existing command.
+[Workflows](../../plugins/workflows/README.md) already has persisted runs/calls,
+parallel calls, sequencing, retries, replay, worker discovery, notifications and
+progress UI. [SDK threads](../../packages/sdk/src/areas/threads.ts) supplies spawn,
+fork, send, stop, wait and inspection. Fresh workers get explicit briefs; copied
+history is a separate choice. Direct work and concise ad-hoc delegation remain
+valid; users need not write a workflow script for every request.
 
-## Records and invariants
+The narrow extensions to prove are:
 
-Keep task, attempt, review and evidence separate. A task has a spec version,
-requirement IDs, scope, declared checks and delivery status. An attempt has a
-stable launch intent, worker profile, native thread/workflow IDs, host/workspace,
-base revision, state and artifact references. Evidence binds a check and its
-result to immutable content, spec version and relevant environment.
+1. **Supported integration API.** `bb.sdk.plugins.callRpc` exists, but Workflows
+   currently registers UI inspection/stop RPCs. Start is an agent tool/CLI/private
+   service operation. Add typed experimental start/result/cancel and scoped
+   guidance operations over that service, with stable caller task/launch identity.
+   No imports of another plugin's private database/service or server-side CLI
+   shelling. New public SDK surfaces need guide and API-audit updates.
+2. **Environment and access choice.** Workflows currently reuses the origin
+   environment and permissions for every call. Add per-assignment native choices.
+   Worktrees are optional: shared checkout use is valid for read-only or
+   coordinated work. Competing writes require isolation or enforceable ownership.
+   Record the actual environment and scope; do not equate a scope description
+   with enforced filesystem confinement.
+3. **Truthful stop/replacement.** Native lifecycle has an internal `requireStopped`
+   path, but public stop is weaker and Workflows discards stop failures/results.
+   Extend the native contract and reconcile uncertain workers before replacement.
+   Thread settlement alone does not prove detached processes cannot still write.
+4. **Supervision.** Reuse native events, bounded output and send modes. Expose
+   call/thread linkage and guidance outcomes; distinguish queued/sent guidance
+   from observed compliance. Add durable guidance identity only where needed.
 
-Persist intent before launch and correlate native ownership metadata. If a
-response is lost, reconcile the existing worker before starting another.
-Unknown launch or stop state stays unresolved until established. A transport
-acknowledgement is not proof of applied steering or a stopped writer.
+Sources: [Workflows service](../../plugins/workflows/src/service.ts),
+[RPC registration](../../plugins/workflows/src/server.ts),
+[call options](../../plugins/workflows/src/types.ts) and native thread lifecycle.
+These extensions are proposals, not shipped APIs. Workflows is disabled by default;
+Factory must configure the dependency deliberately. Credentials stay with providers.
 
-Only one lifecycle owner retries an attempt. Application-level rework is a new
-recorded attempt following a diagnosis, not a hidden duplicate of a native
-retry. Cancellation must confirm the old writer is stopped before another
-writer receives its scope. Integrating or delivering twice after repeated
-completion notifications is forbidden.
+Workflows `parallel` can return `null` for failed calls; preserve attributed
+failures. Its `pipeline` streams per item and is not a global review barrier.
+Successful replay assumes earlier effects remain in the same environment; it
+cannot establish current content acceptance.
 
-Acceptance is independent of successful worker output. Validate predeclared
-checks outside the worker, against a captured commit/snapshot including new
-files. Revalidate content before acceptance. Changed relevant spec/content or
-check definitions invalidate evidence. Do not use unchanged HEAD as proof that
-a dirty worktree has not changed.
+## Connect the existing Team picker
 
-## Native gaps to prove
+[Factory Team](../../plugins/factory-team/README.md) already persists versioned
+Auto/Off/Selected preferences and exposes `bb_team_get`, CLI and RPC. It currently
+guides the lead, rather than constraining actual launches.
 
-1. **Workspace ownership:** Workflows reuses the origin environment for worker
-   threads. Do not fan out concurrent writers in that workspace. The first slice
-   serializes writing; later isolation needs verified worktree/environment wiring.
-2. **Replay:** Workflows reuses successful calls in the same workspace assuming
-   their effects remain. bbfactory must verify content/effects before accepting
-   resumed work; cached output cannot establish fresh acceptance evidence.
-3. **Checks:** QuickJS intentionally has no shell/filesystem access. Independent
-   check execution belongs in a narrow host service outside the workflow script.
-4. **Notifications:** completion delivery is at-least-once. Use stable identifiers
-   for product transitions and reconcile durable state after reconnect/restart.
-5. **Providers:** Devin is not a shipped default provider at this pin. Test its
-   ACP compatibility through the native provider mechanism. Validate GLM/Z.ai's
-   actual harness/auth/model path separately. Resume, steering, sandboxing, usage
-   and rotation support must be checked per integration.
-6. **Retry/stop boundary:** the inspected Workflows stop helper discards the
-   SDK stop result, which can remain `stopping`; retry paths clear the previous
-   thread reference. Native durability does not prove exclusive writer safety.
-   Prove termination/ownership across this boundary or patch the native path
-   before enabling writer retries or automatic replacement.
-7. **Limits:** Workflows already has concurrency, call and elapsed-time controls.
-   Expose intentional limits and account for its retry behavior before adding
-   subscription policy. A timeout or quota observation is not a completed task.
+Resolve Factory assignments from that same record and validate availability on
+the target host. Selected profiles limit choices, not worker count. Preserve the
+lead and explicit task overrides; never silently substitute a model or overwrite
+saved preferences. Record the preference revision used. Changes affect future
+decisions, not running workers. Keep the existing picker and migrate its data if
+package ownership moves.
 
-## Adapting Pragmatic Orchestration
+## Executable specifications inside Factory
 
-Retain useful behavior: precise briefs, context selection, early supervision,
-bounded observations, delta steering, peer review with distinct findings,
-revision-bound acceptance, diagnosed retries, recovery and preserved handovers.
-Some of these are instructions; others need enforced state transitions. Label
-which is which and test observed behavior, not just prompt presence.
+Use one chain: requirement → optional behavioral scenario → actual project
+check → evidence on tested content. Checks explicitly reference requirements.
+Given/When/Then without a test is prose. Reuse project test tools; no mandatory
+Gherkin, replacement test runner or separate SDD plugin is needed.
 
-Preserve upstream skill/reference/prompt text nearly verbatim where compatible.
-Use verified native tools and CLI commands in examples; an SDK method is not
-automatically an agent tool. Missing automation must stay explicitly unavailable
-until implemented. The [parity map](parity-map.md) distinguishes preserved
-guidance, native-call substitutions and executable invariants, and records the
-source assets and proposed work packages. This is a behavior map, not evidence
-of implemented coverage.
+The Factory host module runs declared checks independently of worker claims and
+records spec/check versions, content identity, environment, outcome and logs.
+Unmapped requirements stay unverified; human judgments stay explicit. The compact
+card opens details, native worker threads and changes. UI, tools and CLI share
+records. Factory owns acceptance; Workflows owns execution status. Recheck final
+integrated content and invalidate evidence after relevant changes. Failed checks,
+unresolved required findings and unknown content cannot become a green result.
 
-[coverage.md](coverage.md) preserves 135 upstream source-inventory rows. Map each
-relevant behavior to inherited BB support, adaptation, new implementation or a
-justified non-applicable implementation detail. The old table's Porch-specific
-port suggestions are historical hypotheses, not requirements to re-create its
-CLI, registry and process supervisor.
+## Retain useful PR #6 work
 
-Porch remains useful as an external development tool. An optional runtime
-adapter is justified only by a demonstrated missing native capability and its
-maintenance cost. If added, it must have one lifecycle owner. Porch is an ACP
-client, not an ACP server or a provider that can simply be registered in BB.
+Retain task/evidence concepts, check UI, CLI/tool consistency and direct execution.
+Add requirement-to-check mapping. Replace duplicate spawn/discovery/stop/retry
+logic with native execution associations. Move useful failure tests to that owner.
+Do not carry over host verification unchanged: review found problems with uncertain
+checks, escaped processes, archival stops, path aliases and freshness watchers.
+The [next slice](first-slice.md) proves the boundary before broad integration.
+
+## Pragmatic coverage remains required
+
+The 95%+ useful-behavior target stays. Preserve skill/reference/prompt text nearly
+verbatim where compatible, adapt commands, and implement missing native behavior.
+Do not translate every instruction into TypeScript. Bundled text, working tools
+and demonstrated behavior are separate evidence.
+
+The [parity map](parity-map.md) and [source inventory](coverage.md) track review,
+supervision, context/session handling, steering, recovery and handover. Row counts
+are not measured coverage. No automatic quota optimizer is required; useful quota
+inspection and delegation practices remain. Porch remains a development tool,
+not a second required product execution runtime.
