@@ -416,6 +416,61 @@ describe("Factory acceptance against real SQLite migrations", () => {
     expect(copy.task.requirements).toEqual(restored.task.requirements);
   });
 
+  it("retains exported revision provenance without transferring acceptance and imports legacy v1 bundles", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    await f.service.updateTask({
+      taskId: task.id,
+      expectedVersion: 1,
+      spec: { ...spec, scope: "Revised booking scope" },
+      changeReason: "Clarified scope",
+    });
+    await f.service.verifyTask(task.id);
+    const bundle = f.service.exportSpec({ taskId: task.id });
+    expect(bundle.source).toEqual({
+      taskId: task.id,
+      specVersion: 2,
+      exportedAt: expect.any(Number),
+    });
+    const imported = await f.service.importSpec({ threadId: "thread", bundle });
+    const copy = await f.service.getTaskDetail(imported.task.id);
+    expect(copy.task).toMatchObject({
+      phase: "draft",
+      status: "unverified",
+      specVersion: 1,
+    });
+    expect(copy.evidence).toEqual([]);
+    expect(copy.approvals).toEqual([]);
+    expect(copy.notes[0]).toMatchObject({
+      kind: "note",
+      specVersion: 1,
+      fingerprint: null,
+    });
+    expect(copy.notes[0].text).toContain(`task ${task.id}, revision 2`);
+    const store = createStore(f.connection.$client);
+    expect(
+      store.artifactValue(
+        `${copy.task.id}:import-source`,
+        copy.task.id,
+        "import-source",
+      ),
+    ).toEqual(bundle.source);
+    const restarted = createFactoryService(f.bb);
+    expect((await restarted.getTaskDetail(copy.task.id)).notes).toEqual(
+      copy.notes,
+    );
+    const legacy = await f.service.importSpec({
+      threadId: "thread",
+      bundle: { format: "factory-spec", formatVersion: 1, spec: bundle.spec },
+    });
+    const legacyCopy = await f.service.getTaskDetail(legacy.task.id);
+    expect(legacyCopy.task.status).toBe("unverified");
+    expect(legacyCopy.notes).toEqual([]);
+    expect((await f.service.getTaskDetail(task.id)).task.status).toBe(
+      "accepted",
+    );
+  });
+
   it("rejects idle cancellation and resumes legacy stops without launching or invalidating evidence", async () => {
     const f = fixture();
     const { task } = await f.create();

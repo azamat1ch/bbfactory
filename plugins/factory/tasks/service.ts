@@ -435,6 +435,83 @@ export function createFactoryService(
     }
     return state;
   }
+  async function createTaskRecord(
+    input: Input<"factoryCreateTask">,
+    source: Input<"factoryImportSpec">["bundle"]["source"],
+  ) {
+    input = factoryRpcContract.factoryCreateTask.input.parse(input);
+    const thread = await bb.sdk.threads.get({ threadId: input.threadId });
+    if (!thread.environmentId || thread.archivedAt || thread.deletedAt)
+      throw new Error("An active thread environment is required");
+    const now = Date.now();
+    const taskId = `bft_${randomUUID()}`;
+    const detail: FactoryTaskDetail = {
+      observedContent: null,
+      invalidatedEvidenceIds: [],
+      approvals: [],
+      deliveries: [],
+      task: {
+        id: taskId,
+        projectId: thread.projectId,
+        originThreadId: thread.id,
+        environmentId: thread.environmentId,
+        ...input.spec,
+        phase: "draft",
+        specVersion: 1,
+        status: "unverified",
+        statusDetail: "No acceptance evidence",
+        archived: false,
+        stopRequested: false,
+        executionRunning: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+      assignments: [],
+      evidence: [],
+      findings: [],
+      judgments: [],
+      reviews: [],
+      notes: [],
+      specs: [
+        {
+          version: 1,
+          spec: input.spec,
+          changeReason: "Initial specification",
+          createdAt: now,
+        },
+      ],
+    };
+    if (source) {
+      detail.notes.push({
+        id: randomUUID(),
+        taskId,
+        kind: "note",
+        text: `Imported specification with bundle-declared source task ${source.taskId}, revision ${source.specVersion}, exported at Unix timestamp ${source.exportedAt} ms. Source metadata is historical; no verification or approval was transferred.`,
+        artifactRefs: [],
+        specVersion: 1,
+        fingerprint: null,
+        createdAt: now,
+      });
+    }
+    db.transaction(() => {
+      if (source) {
+        store.artifact(
+          `${taskId}:import-source`,
+          taskId,
+          "import-source",
+          source,
+        );
+        for (const note of detail.notes)
+          store.artifact(note.id, taskId, "note", note);
+      }
+      store.artifact(`${taskId}:spec:1`, taskId, "spec", detail.specs[0]);
+      save(detail);
+    })();
+    return {
+      task: detail.task,
+      previewDirective: `::factory-task{taskId="${taskId}"}`,
+    };
+  }
   const service = {
     exportSpec(input: Input<"factoryExportSpec">) {
       input = factoryRpcContract.factoryExportSpec.input.parse(input);
@@ -442,6 +519,11 @@ export function createFactoryService(
       return factoryRpcContract.factoryExportSpec.output.parse({
         format: "factory-spec",
         formatVersion: 1,
+        source: {
+          taskId: detail.task.id,
+          specVersion: detail.task.specVersion,
+          exportedAt: Date.now(),
+        },
         spec: detail.specs.find((s) => s.version === detail.task.specVersion)!
           .spec,
       });
@@ -450,10 +532,10 @@ export function createFactoryService(
       input: Input<"factoryImportSpec">,
     ): Promise<z.infer<typeof factoryRpcContract.factoryImportSpec.output>> {
       input = factoryRpcContract.factoryImportSpec.input.parse(input);
-      return service.createTask({
-        threadId: input.threadId,
-        spec: input.bundle.spec,
-      });
+      return createTaskRecord(
+        { threadId: input.threadId, spec: input.bundle.spec },
+        input.bundle.source,
+      );
     },
     resumeTask(input: Input<"factoryResumeTask">) {
       input = factoryRpcContract.factoryResumeTask.input.parse(input);
@@ -572,57 +654,8 @@ export function createFactoryService(
       });
     },
 
-    async createTask(input: Input<"factoryCreateTask">) {
-      input = factoryRpcContract.factoryCreateTask.input.parse(input);
-      const thread = await bb.sdk.threads.get({ threadId: input.threadId });
-      if (!thread.environmentId || thread.archivedAt || thread.deletedAt)
-        throw new Error("An active thread environment is required");
-      const now = Date.now();
-      const taskId = `bft_${randomUUID()}`;
-      const detail: FactoryTaskDetail = {
-        observedContent: null,
-        invalidatedEvidenceIds: [],
-        approvals: [],
-        deliveries: [],
-        task: {
-          id: taskId,
-          projectId: thread.projectId,
-          originThreadId: thread.id,
-          environmentId: thread.environmentId,
-          ...input.spec,
-          phase: "draft",
-          specVersion: 1,
-          status: "unverified",
-          statusDetail: "No acceptance evidence",
-          archived: false,
-          stopRequested: false,
-          executionRunning: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        assignments: [],
-        evidence: [],
-        findings: [],
-        judgments: [],
-        reviews: [],
-        notes: [],
-        specs: [
-          {
-            version: 1,
-            spec: input.spec,
-            changeReason: "Initial specification",
-            createdAt: now,
-          },
-        ],
-      };
-      db.transaction(() => {
-        store.artifact(`${taskId}:spec:1`, taskId, "spec", detail.specs[0]);
-        save(detail);
-      })();
-      return {
-        task: detail.task,
-        previewDirective: `::factory-task{taskId="${taskId}"}`,
-      };
+    createTask(input: Input<"factoryCreateTask">) {
+      return createTaskRecord(input, undefined);
     },
     getTaskDetail(taskId: string) {
       if (checks.has(taskId)) return Promise.resolve(store.get(taskId));

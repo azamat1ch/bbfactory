@@ -245,6 +245,13 @@ export const deliverySchema = z.strictObject({
 export const specBundleSchema = z.strictObject({
   format: z.literal("factory-spec"),
   formatVersion: z.literal(1),
+  source: z
+    .strictObject({
+      taskId: id,
+      specVersion: z.number().int().positive(),
+      exportedAt: z.number().int().nonnegative(),
+    })
+    .optional(),
   spec: specSchema,
 });
 export const taskDetailSchema = z.strictObject({
