@@ -5,6 +5,7 @@ import {
   CURSOR_ACP_MAINTENANCE,
   type AcpMaintenanceDialect,
 } from "./bridge/provider-maintenance.js";
+import { DEVIN_ACP_MAINTENANCE } from "./bridge/provider-maintenance-devin.js";
 import { delegationPresentation } from "./presentation.js";
 import {
   commandRawOutputSchema,
@@ -368,11 +369,17 @@ export const OPENCODE_ACP_DIALECT: AcpDialect = {
   normalizeCommandEvent: normalizeOpenCodeCommandEvent,
 };
 
+export const DEVIN_ACP_DIALECT: AcpDialect = {
+  id: "devin",
+  maintenance: DEVIN_ACP_MAINTENANCE,
+};
+
 const DIALECTS_BY_ID: ReadonlyMap<string, AcpDialect> = new Map([
   [CURSOR_ACP_DIALECT.id, CURSOR_ACP_DIALECT],
   [GROK_ACP_DIALECT.id, GROK_ACP_DIALECT],
   [OMP_ACP_DIALECT.id, OMP_ACP_DIALECT],
   [OPENCODE_ACP_DIALECT.id, OPENCODE_ACP_DIALECT],
+  [DEVIN_ACP_DIALECT.id, DEVIN_ACP_DIALECT],
 ]);
 
 const DIALECT_IDS_BY_COMMAND: Readonly<Record<string, string>> = {
@@ -380,6 +387,7 @@ const DIALECT_IDS_BY_COMMAND: Readonly<Record<string, string>> = {
   grok: GROK_ACP_DIALECT.id,
   omp: OMP_ACP_DIALECT.id,
   opencode: OPENCODE_ACP_DIALECT.id,
+  devin: DEVIN_ACP_DIALECT.id,
 };
 
 export function resolveAcpDialect(launch: {

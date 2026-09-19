@@ -2360,6 +2360,9 @@ importers:
       '@bb/provider-bridge-protocol':
         specifier: workspace:*
         version: link:../provider-bridge-protocol
+      smol-toml:
+        specifier: 1.7.1
+        version: 1.7.1
       zod:
         specifier: 4.3.6
         version: 4.3.6
