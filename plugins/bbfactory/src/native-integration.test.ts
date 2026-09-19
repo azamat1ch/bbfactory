@@ -151,6 +151,7 @@ it("carries two selected assignments through real Workflows and only accepts che
             id: "R1",
             text: "Integrated changes pass regression",
             criterion: "automated",
+            verificationMethods: [],
             reviewInstructions: "",
             artifactRefs: [],
           },
