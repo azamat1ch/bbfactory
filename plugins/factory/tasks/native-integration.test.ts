@@ -1,3 +1,4 @@
+import { executionSnapshotSchema } from "../execution/execution-contract.js";
 import { createConnection, migrate } from "@bb/db";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { expect, it } from "vitest";
@@ -110,7 +111,9 @@ it("carries two selected assignments through real Workflows and only accepts che
               revision: 4,
               environmentId: "integration",
             };
-          throw new Error(`Unexpected cross-plugin execution RPC: ${call.pluginId}`);
+          throw new Error(
+            `Unexpected cross-plugin execution RPC: ${call.pluginId}`,
+          );
         },
       },
     },
@@ -134,7 +137,9 @@ it("carries two selected assignments through real Workflows and only accepts che
           },
   });
   factory.bb.storage.database = () => factoryDb.$client;
-  factoryDb.$client.exec("CREATE TABLE factory_legacy_launches (task_id TEXT, launch_id TEXT)");
+  factoryDb.$client.exec(
+    "CREATE TABLE factory_legacy_launches (task_id TEXT, launch_id TEXT)",
+  );
   const service = createFactoryService(factory.bb, true, handlers);
   const controller = new AbortController();
   const running = execution.runWorker(controller.signal);
@@ -177,7 +182,7 @@ it("carries two selected assignments through real Workflows and only accepts che
       title: `Change ${id}`,
       prompt: `Implement ${id}`,
       scope: `src/${id}`,
-      ownership: "exclusive" as const,
+      ownership: id === "a" ? ("read-only" as const) : ("exclusive" as const),
       profile,
       environmentId: `worker-${id}`,
       permissionMode: "full" as const,
@@ -188,6 +193,17 @@ it("carries two selected assignments through real Workflows and only accepts che
     ).rejects.toThrow("Team is Off");
     teamMode = "selected";
     await service.assign({ taskId: task.id, launchId: "work", assignments });
+    const dispatched = executionSnapshotSchema.parse(
+      await native.harness.callRpc("experimental_executionInspect", {
+        originThreadId: "origin",
+        callerTaskId: task.id,
+        launchId: "work",
+      }),
+    );
+    expect(
+      dispatched.assignments.map((assignment) => assignment.ownership),
+    ).toEqual(["read-only", "exclusive"]);
+
     await expect.poll(() => workers).toBe(2);
     await expect(service.verifyTask(task.id)).rejects.toThrow(
       "settled native assignments",

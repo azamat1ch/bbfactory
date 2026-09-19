@@ -318,9 +318,17 @@ describe("workflow service policy integration", () => {
     const registered = await plugin(bb);
     expect(harness.registrations.settingsDescriptors).not.toEqual({});
 
-    const first = { runId: (await registered.service.start({
-      projectId: "project-test", originThreadId: "thread-test", source: source("return null;", "settings-one"), args: null, resumedFromRunId: null,
-    })).id };
+    const first = {
+      runId: (
+        await registered.service.start({
+          projectId: "project-test",
+          originThreadId: "thread-test",
+          source: source("return null;", "settings-one"),
+          args: null,
+          resumedFromRunId: null,
+        })
+      ).id,
+    };
     const next = {
       maxActiveRuns: 2,
       maxConcurrentAgents: 4,
@@ -330,9 +338,17 @@ describe("workflow service policy integration", () => {
       maxNotificationBytes: 4096,
     };
     await harness.setSettings(next);
-    const second = { runId: (await registered.service.start({
-      projectId: "project-test", originThreadId: "thread-test", source: source("return null;", "settings-two"), args: null, resumedFromRunId: null,
-    })).id };
+    const second = {
+      runId: (
+        await registered.service.start({
+          projectId: "project-test",
+          originThreadId: "thread-test",
+          source: source("return null;", "settings-two"),
+          args: null,
+          resumedFromRunId: null,
+        })
+      ).id,
+    };
 
     const cliContext = {
       threadId: "thread-test",
@@ -1893,6 +1909,7 @@ describe("native assignment execution RPC", () => {
           environment: { type: "reuse", environmentId: "worktree-a" },
           permissionMode: "full",
           scope: "src/a.ts",
+          ownership: "exclusive",
         },
       ],
     };
@@ -2133,6 +2150,138 @@ describe("native assignment execution RPC", () => {
       await worker;
     }
   });
+  it("runs declared readers together, then waits for reader settlement before a writer and its following reader", async () => {
+    const test = fixture();
+    const input = request();
+    const base = input.assignments[0]!;
+    input.assignments = [
+      { ...base, id: "reader-a", ownership: "read-only" },
+      { ...base, id: "reader-b", ownership: "read-only" },
+      { ...base, id: "writer", ownership: "exclusive" },
+      { ...base, id: "reader-after", ownership: "read-only" },
+    ];
+    await test.harness.callRpc("experimental_executionStart", input);
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(2));
+      for (const call of test.harness.sdk.callsTo("threads.spawn"))
+        expect(call[0]).toMatchObject({ permissionMode: "full" });
+      test.service.onThreadIdle("child-1", "read a");
+      await eventually(() =>
+        expect(
+          test.db
+            .prepare(
+              "SELECT COUNT(*) AS count FROM workflow_calls WHERE status = 'succeeded'",
+            )
+            .get(),
+        ).toEqual({ count: 1 }),
+      );
+      expect(test.childCount()).toBe(2);
+      test.service.onThreadIdle("child-2", "read b");
+      await eventually(() => expect(test.childCount()).toBe(3));
+      test.service.onThreadIdle("child-3", "written");
+      await eventually(() => expect(test.childCount()).toBe(4));
+      test.service.onThreadIdle("child-4", "read after writer");
+      await eventually(async () =>
+        expect(
+          executionSnapshotSchema.parse(
+            await test.harness.callRpc(
+              "experimental_executionInspect",
+              inputIdentity(input),
+            ),
+          ).status,
+        ).toBe("succeeded"),
+      );
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+
+  it("shares active readers across canonical aliases but excludes writers and uncertain settled runs", async () => {
+    const test = fixture();
+    test.harness.sdk.stub(
+      "environments.get",
+      async ({ environmentId }: { environmentId: string }) =>
+        ({
+          id: environmentId,
+          hostId: "host-1",
+          projectId: "project-test",
+          path: "/workspaces/shared",
+        }) as never,
+    );
+    const first = request();
+    first.assignments[0]!.ownership = "read-only";
+    const started = executionSnapshotSchema.parse(
+      await test.harness.callRpc("experimental_executionStart", first),
+    );
+    const second = {
+      ...first,
+      launchId: "second-reader",
+      assignments: [
+        {
+          ...first.assignments[0]!,
+          environment: { type: "reuse" as const, environmentId: "alias" },
+        },
+      ],
+    };
+    await expect(
+      test.harness.callRpc("experimental_executionStart", second),
+    ).resolves.toMatchObject({ status: "queued" });
+    const writer = { ...request(), launchId: "writer" };
+    await expect(
+      test.harness.callRpc("experimental_executionStart", writer),
+    ).rejects.toThrow("ownership");
+    test.db
+      .prepare("UPDATE workflow_runs SET status = 'cancelled' WHERE id = ?")
+      .run(started.runId);
+    test.db
+      .prepare("INSERT INTO workflow_spawn_attempts VALUES (?, ?, ?, ?)")
+      .run("uncertain", started.runId, "lost-reader", "attached");
+    await expect(
+      test.harness.callRpc("experimental_executionStart", {
+        ...first,
+        launchId: "third-reader",
+      }),
+    ).rejects.toThrow("unresolved");
+  });
+
+  it("defaults old requests to exclusive ownership and retries their persisted identity without relaunch", async () => {
+    const test = fixture();
+    const current = request();
+    const legacy = {
+      ...current,
+      assignments: current.assignments.map(
+        ({ ownership, ...assignment }) => assignment,
+      ),
+    };
+    const started = executionSnapshotSchema.parse(
+      await test.harness.callRpc("experimental_executionStart", legacy),
+    );
+    expect(started.assignments[0]?.ownership).toBe("exclusive");
+    test.db
+      .prepare("UPDATE workflow_runs SET args_json = ? WHERE id = ?")
+      .run(JSON.stringify(legacy), started.runId);
+    await expect(
+      test.harness.callRpc("experimental_executionStart", legacy),
+    ).resolves.toMatchObject({ runId: started.runId });
+    const reader = {
+      ...current,
+      launchId: "reader",
+      assignments: current.assignments.map((assignment) => ({
+        ...assignment,
+        ownership: "read-only",
+      })),
+    };
+    await expect(
+      test.harness.callRpc("experimental_executionStart", reader),
+    ).rejects.toThrow("ownership");
+    expect(
+      test.db.prepare("SELECT COUNT(*) AS count FROM workflow_runs").get(),
+    ).toEqual({ count: 1 });
+  });
+
   it("serializes shared workspaces and preserves chosen target permissions and service tier", async () => {
     const test = fixture();
     test.harness.sdk.stub(

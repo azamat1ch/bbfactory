@@ -1007,3 +1007,8 @@ plugin. Factory can still inspect settled legacy task results afterward.
 `bb factory execution guide --help` and `bb factory execution wait --help` include
 complete JSON examples, accepted modes, cursor reuse and timeout bounds; these
 commands do not require looking up raw RPC schemas to construct their input.
+
+Factory assignments carry advisory `ownership` (`read-only` or `exclusive`) into
+execution. Omitted legacy ownership is exclusive. Readers may share a canonical
+workspace; writers retain exclusive coordination, and unconfirmed worker stops
+block reuse. This metadata does not change or weaken provider `permissionMode`.

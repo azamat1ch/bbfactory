@@ -39,6 +39,12 @@ export const executionAssignmentSchema = z
       .strict(),
     permissionMode: z.enum(["accept-edits", "auto", "full"]),
     scope: z.string().min(1).max(10_000),
+    ownership: z
+      .enum(["read-only", "exclusive"])
+      .default("exclusive")
+      .describe(
+        "Advisory workspace coordination only; does not change provider permissions. Omitted legacy metadata is exclusive.",
+      ),
   })
   .strict();
 export const executionStartSchema = executionIdentitySchema
@@ -73,6 +79,7 @@ export const executionSnapshotSchema = z
           environmentId: id,
           permissionMode: z.enum(["accept-edits", "auto", "full"]),
           scope: z.string(),
+          ownership: z.enum(["read-only", "exclusive"]).default("exclusive"),
         })
         .strict(),
     ),

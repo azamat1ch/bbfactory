@@ -984,6 +984,7 @@ export function createFactoryService(
                 environment: { type: "reuse", environmentId: a.environmentId },
                 permissionMode: a.permissionMode,
                 scope: a.scope,
+                ownership: a.ownership,
               })),
             },
           });

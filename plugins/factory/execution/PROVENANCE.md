@@ -46,3 +46,17 @@ remain with the original owner; migration itself starts or stops no workers.
 Legacy guidance/waits remain on the Workflows RPC/CLI surfaces until drain. New
 Factory control uses `bb factory execution`; its discoverable RPC contract is on
 `factory-team`. No legacy runtime record is claimed as migrated execution.
+
+## Advisory reader access
+
+Factory execution accepts `ownership: "read-only" | "exclusive"` on assignments;
+missing legacy metadata defaults to exclusive. This is coordination metadata,
+not a provider sandbox or permission change. Read-only worker prompts explicitly
+instruct workers not to modify workspace files. Existing permissionMode remains
+unchanged. Concurrent readers may share a canonical workspace; a writer waits
+for prior readers in the same launch and blocks against overlapping active runs.
+Stopped/failed runs with unconfirmed workers remain blocking even when they were
+read-only. Cross-run sharing conservatively requires every assignment in the
+existing run to be read-only; mixed runs retain exclusive reservation until
+settled. Cross-plugin owner drain remains exclusive. Stored legacy requests are
+normalized for identity checks without rewriting their execution records.

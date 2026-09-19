@@ -1,3 +1,4 @@
+import { hasWorkspaceConflict } from "./workspace-ownership.js";
 import { assertExecutionOwnerSettled } from "./owner-guard.js";
 import {
   executionStartSchema,
@@ -651,7 +652,11 @@ export function createWorkflowService(
     if (input.executionRunId !== undefined) {
       const existing = getRun(db, input.executionRunId);
       if (existing !== null) {
-        if (existing.argsJson !== JSON.stringify(input.args))
+        if (
+          JSON.stringify(
+            executionStartSchema.parse(JSON.parse(existing.argsJson)),
+          ) !== JSON.stringify(executionStartSchema.parse(input.args))
+        )
           throw new Error("Launch identity already has a different request");
         return existing;
       }
@@ -694,19 +699,37 @@ export function createWorkflowService(
       }
     }
     const created = db.transaction(() => {
-      if (shuttingDown) throw new Error("Execution owner is shutting down; launch was not committed");
-      for (const { hostId, rootPath } of Object.values(
+      if (shuttingDown)
+        throw new Error(
+          "Execution owner is shutting down; launch was not committed",
+        );
+      for (const [environmentId, { hostId, rootPath }] of Object.entries(
         input.executionHosts ?? {},
       )) {
-        const conflict = db
-          .prepare(`SELECT 1 FROM workflow_execution_environments environments JOIN workflow_runs runs ON runs.id = environments.run_id
-          WHERE environments.host_id = ? AND (runs.status IN ('queued', 'running') OR EXISTS (
-            SELECT 1 FROM workflow_spawn_attempts attempts WHERE attempts.run_id = runs.id AND attempts.state != 'stopped'
-          )) AND (rtrim(environments.root_path, '/') = rtrim(?, '/')
-            OR substr(rtrim(environments.root_path, '/'), 1, length(rtrim(?, '/')) + 1) = rtrim(?, '/') || '/'
-            OR substr(rtrim(?, '/'), 1, length(rtrim(environments.root_path, '/')) + 1) = rtrim(environments.root_path, '/') || '/') LIMIT 1`)
-          .get(hostId, rootPath, rootPath, rootPath, rootPath);
-        if (conflict)
+        const assignments =
+          input.executionRunId === undefined
+            ? []
+            : executionStartSchema
+                .parse(input.args)
+                .assignments.filter(
+                  (assignment) =>
+                    assignment.environment.environmentId === environmentId,
+                );
+        const ownership =
+          assignments.length > 0 &&
+          assignments.every(
+            (assignment) => assignment.ownership === "read-only",
+          )
+            ? "read-only"
+            : "exclusive";
+        if (
+          hasWorkspaceConflict(db, {
+            environmentId,
+            hostId,
+            rootPath,
+            ownership,
+          })
+        )
           throw new Error(
             "Assignment workspace has active or unresolved execution ownership",
           );
@@ -1562,8 +1585,10 @@ export function createWorkflowService(
         ).catch((error: unknown) => {
           if (run.id.startsWith("wfr_exec_") && options.title !== null) {
             const latest = getCall(db, run.id, index);
-            db.prepare(`INSERT OR IGNORE INTO workflow_execution_events
-              (run_id, assignment_id, thread_id, status, result_json, error) VALUES (?, ?, ?, ?, NULL, ?)`).run(
+            db.prepare(
+              `INSERT OR IGNORE INTO workflow_execution_events
+              (run_id, assignment_id, thread_id, status, result_json, error) VALUES (?, ?, ?, ?, NULL, ?)`,
+            ).run(
               run.id,
               options.title,
               latest?.childThreadId ?? null,

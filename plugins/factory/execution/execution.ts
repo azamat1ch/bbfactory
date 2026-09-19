@@ -1,3 +1,4 @@
+import { hasWorkspaceConflict } from "./workspace-ownership.js";
 import { createExecutionSupervision } from "./execution-supervision.js";
 import { workflowHostContract } from "./host-contract.js";
 import { createHash } from "node:crypto";
@@ -35,14 +36,18 @@ export function executionSource(
       model: assignment.model,
       reasoningLevel: assignment.reasoningLevel,
     };
-    const prompt = `${assignment.prompt}\n\nDeclared coordination scope (advisory, not filesystem confinement): ${assignment.scope}`;
-    return `{ id: ${JSON.stringify(assignment.id)}, group: ${JSON.stringify(groups[assignment.environment.environmentId])}, run: () => agent(${JSON.stringify(prompt)}, ${JSON.stringify(options)}) }`;
+    const prompt = `${assignment.prompt}\n\nDeclared coordination scope (advisory, not filesystem confinement): ${assignment.scope}${assignment.ownership === "read-only" ? "\nRead-only assignment: do not modify files in this workspace. This declaration does not change provider permissions." : ""}`;
+    return `{ id: ${JSON.stringify(assignment.id)}, group: ${JSON.stringify(groups[assignment.environment.environmentId])}, ownership: ${JSON.stringify(assignment.ownership)}, run: () => agent(${JSON.stringify(prompt)}, ${JSON.stringify(options)}) }`;
   });
   return `export const meta = { name: "delegated-assignments", description: "Native assignment execution" };
 const tails = Object.create(null);
 const assignments = [${assignments.join(",")}];
 const tasks = assignments.map((assignment) => {
-  const previous = tails[assignment.group] || Promise.resolve();
+  const group = tails[assignment.group] || { writer: Promise.resolve(null), readers: [] };
+  tails[assignment.group] = group;
+  const previous = assignment.ownership === "read-only"
+    ? group.writer
+    : Promise.all([group.writer, ...group.readers]).then((results) => results.find((result) => result && result.status === "failed") || null);
   const pending = previous.then(async (previousResult) => {
     if (previousResult && previousResult.status === "failed") return { id: assignment.id, status: "failed", result: null, error: "Prior overlapping assignment failed; replacement blocked" };
     try {
@@ -52,7 +57,8 @@ const tasks = assignments.map((assignment) => {
       return { id: assignment.id, status: "failed", result: null, error: String(error) };
     }
   });
-  tails[assignment.group] = pending;
+  if (assignment.ownership === "read-only") group.readers.push(pending);
+  else { group.writer = pending; group.readers = []; }
   return () => pending;
 });
 const results = await parallel(tasks);
@@ -87,6 +93,7 @@ export function inspectExecution(
       environmentId: assignment.environment.environmentId,
       permissionMode: assignment.permissionMode,
       scope: assignment.scope,
+      ownership: assignment.ownership,
     };
   });
   const unsettled = db
@@ -126,7 +133,11 @@ export function registerExecutionRpc(
     const runId = executionRunId(input);
     const existing = service.get(runId);
     if (existing !== null) {
-      if (existing.argsJson !== JSON.stringify(input))
+      if (
+        JSON.stringify(
+          executionStartSchema.parse(JSON.parse(existing.argsJson)),
+        ) !== JSON.stringify(input)
+      )
         throw new Error("Launch identity already has a different request");
       return inspect(input);
     }
@@ -151,16 +162,13 @@ export function registerExecutionRpc(
         hostId: environment.hostId,
         rootPath: canonical.path,
       };
-      const occupied = db
-        .prepare(
-          `SELECT environments.root_path AS rootPath FROM workflow_execution_environments environments JOIN workflow_runs runs ON runs.id = environments.run_id
-        WHERE environments.host_id = ? AND (runs.status IN ('queued', 'running') OR EXISTS (
-          SELECT 1 FROM workflow_spawn_attempts attempts WHERE attempts.run_id = runs.id AND attempts.state != 'stopped'
-        ))`,
-        )
-        .all(environment.hostId) as Array<{ rootPath: string }>;
       if (
-        occupied.some((entry) => rootsOverlap(entry.rootPath, canonical.path))
+        hasWorkspaceConflict(db, {
+          environmentId: environment.id,
+          hostId: environment.hostId,
+          rootPath: canonical.path,
+          ownership: assignment.ownership,
+        })
       )
         throw new Error(
           "Assignment workspace has active or unresolved native execution ownership; replacement blocked",
@@ -182,34 +190,6 @@ export function registerExecutionRpc(
         )
       )
         throw new Error(`Service tier ${assignment.serviceTier} unsupported`);
-      const unresolved = db
-        .prepare(
-          `SELECT 1 FROM workflow_spawn_attempts attempts JOIN workflow_runs runs ON runs.id = attempts.run_id
-        WHERE attempts.state != 'stopped' AND (runs.environment_id = ? OR EXISTS (
-          SELECT 1 FROM json_each(runs.args_json, '$.assignments') assignments WHERE json_extract(assignments.value, '$.environment.environmentId') = ?
-        )) LIMIT 1`,
-        )
-        .get(
-          assignment.environment.environmentId,
-          assignment.environment.environmentId,
-        );
-      if (unresolved)
-        throw new Error(
-          "Assignment environment has unresolved worker ownership or stop state; reconcile and cancel the earlier execution before replacement",
-        );
-      const queued = db
-        .prepare(
-          `SELECT 1 FROM workflow_runs runs WHERE runs.status IN ('queued', 'running') AND (
-        runs.environment_id = ? OR EXISTS (SELECT 1 FROM json_each(runs.args_json, '$.assignments') assignments WHERE json_extract(assignments.value, '$.environment.environmentId') = ?)) LIMIT 1`,
-        )
-        .get(
-          assignment.environment.environmentId,
-          assignment.environment.environmentId,
-        );
-      if (queued)
-        throw new Error(
-          "Assignment environment already has an active workflow",
-        );
     }
     await service.start({
       projectId: input.projectId,
@@ -239,7 +219,8 @@ export function registerExecutionRpc(
   );
   const handlers = {
     experimental_executionStart(input: ExecutionStart) {
-      const pending = starts.then(() => start(input));
+      const request = executionStartSchema.parse(input);
+      const pending = starts.then(() => start(request));
       starts = pending.then(
         () => undefined,
         () => undefined,
