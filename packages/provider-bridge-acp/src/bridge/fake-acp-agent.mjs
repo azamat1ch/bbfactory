@@ -93,12 +93,15 @@ const unmappedReasoningConfig =
 const acceptNativeReasoning =
   process.env.FAKE_ACP_ACCEPT_NATIVE_REASONING === "1";
 const setConfigModelError = process.env.FAKE_ACP_SET_CONFIG_MODEL_ERROR === "1";
+const setConfigModelNoop = process.env.FAKE_ACP_SET_CONFIG_MODEL_NOOP === "1";
 const setConfigFastError = process.env.FAKE_ACP_SET_CONFIG_FAST_ERROR === "1";
 const setModelAcceptUnlisted =
   process.env.FAKE_ACP_SET_MODEL_ACCEPT_UNLISTED === "1";
 const setModelBareResult =
   process.env.FAKE_ACP_SET_MODEL_BARE_RESULT === "1";
 const setModelNoop = process.env.FAKE_ACP_SET_MODEL_NOOP === "1";
+const setModelAuthRequired =
+  process.env.FAKE_ACP_SET_MODEL_AUTH_REQUIRED === "1";
 const cursorParameterizedModels =
   process.env.FAKE_ACP_CURSOR_PARAMETERIZED_MODELS === "1";
 const requestLog = process.env.FAKE_ACP_REQUEST_LOG;
@@ -732,6 +735,14 @@ async function handleMessage(message) {
       });
       return;
     case "session/set_model": {
+      if (setModelAuthRequired) {
+        send({
+          jsonrpc: "2.0",
+          id: message.id,
+          error: { code: -32000, message: "Authentication required" },
+        });
+        return;
+      }
       const modelId = message.params?.modelId;
       const acceptsUnlisted =
         setModelAcceptUnlisted || setModelBareResult || setModelNoop;
@@ -791,7 +802,9 @@ async function handleMessage(message) {
           });
           return;
         }
-        selectedModel = value;
+        if (!setConfigModelNoop) {
+          selectedModel = value;
+        }
         send({ jsonrpc: "2.0", id: message.id, result: configState() });
         return;
       }

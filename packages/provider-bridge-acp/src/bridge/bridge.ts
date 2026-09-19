@@ -1140,6 +1140,9 @@ async function requestAcpModelSelection(args: {
       resultSchema: z.union([acpConfigStateResultSchema, z.null()]),
     });
   } catch (error) {
+    if (isAcpAuthRequiredResponse(error)) {
+      throw error;
+    }
     return {
       rejection: `${args.method} rejected the model: ${
         error instanceof Error ? error.message : String(error)

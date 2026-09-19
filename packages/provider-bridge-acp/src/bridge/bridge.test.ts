@@ -1328,6 +1328,31 @@ describe("acp bridge", () => {
     expect(agentMessageTexts()).toContain("selected-model:fake/strong");
   });
 
+  it("falls back to session/set_model when config selection reports the old model", async () => {
+    const requestLog = join(workspaceDir, "config-noop-requests.jsonl");
+    const { providerThreadId } = await startThread({
+      envVars: {
+        FAKE_ACP_MODEL_CONFIG: "1",
+        FAKE_ACP_SET_CONFIG_MODEL_NOOP: "1",
+        FAKE_ACP_REQUEST_LOG: requestLog,
+      },
+      model: "fake/strong",
+    });
+
+    sendTurnRequest("turn/start", providerThreadId, {
+      input: [{ type: "text", text: "echo-selected-model", mentions: [] }],
+    });
+    await waitForTurnCompleted();
+
+    expect(agentMessageTexts()).toContain("selected-model:fake/strong");
+    const methods = loggedAcpRequests(requestLog).map(
+      (request) => request.method,
+    );
+    expect(methods.indexOf("session/set_config_option")).toBeLessThan(
+      methods.indexOf("session/set_model"),
+    );
+  });
+
   it("selects ACP-native models from session models state", async () => {
     const { providerThreadId } = await startThread({
       envVars: { FAKE_ACP_MODELS_FIELD: "1" },
@@ -1399,6 +1424,41 @@ describe("acp bridge", () => {
     expect(requests.some((request) => request.method === "session/prompt")).toBe(
       false,
     );
+  });
+
+  it("preserves auth recovery when model selection requires authentication", async () => {
+    const requestLog = join(workspaceDir, "model-auth-requests.jsonl");
+    nextThreadSerial += 1;
+    const id = sendRequest("thread/start", {
+      threadId: `thread-${nextThreadSerial}`,
+      cwd: workspaceDir,
+      instructionMode: "append",
+      options: executionOptions({
+        model: "fake/strong",
+        providerOptions: {
+          acpLaunchSpec: acpLaunchSpec({
+            envVars: {
+              FAKE_ACP_MODELS_FIELD: "1",
+              FAKE_ACP_SET_MODEL_AUTH_REQUIRED: "1",
+              FAKE_ACP_REQUEST_LOG: requestLog,
+            },
+          }),
+        },
+      }),
+    });
+
+    const response = await waitForResponse(id);
+    expect(response.error?.message).toContain("Authentication required");
+    expect(response.error?.data).toMatchObject({
+      recovery: { kind: "authRequired", retryable: false },
+    });
+    const requests = loggedAcpRequests(requestLog);
+    expect(
+      requests.some((request) => request.method === "session/set_model"),
+    ).toBe(true);
+    expect(
+      requests.some((request) => request.method === "session/prompt"),
+    ).toBe(false);
   });
 
   it("fails clearly when the agent advertises no model selection surface", async () => {
