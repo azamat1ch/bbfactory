@@ -1,10 +1,10 @@
-# Factory guidance internal package
+# Review processing
 
-Bundled automatically inside the single [Factory plugin](../factory-team/README.md); no separate installation is needed. Use `bb factory review collect` for the collector CLI.
+`review.ts` collects attributed reviewer outputs, retains failures, checks quotes
+against supplied snapshots and validates optional judge output. It does not
+launch reviewers or grant acceptance. Use `bb factory review collect --help`.
 
-Read [PLUGIN_OVERVIEW.md](PLUGIN_OVERVIEW.md) for scope, [MIGRATION.md](MIGRATION.md)
-for source disposition, [PORT-COVERAGE.md](PORT-COVERAGE.md) for evidence limits,
-and the [skill](skills/pragmatic-orchestration/SKILL.md) for operating instructions.
-
-Review helpers are pure result processors. They do not launch processes, manage
-threads, claim current content identity, or accept Factory tasks.
+Operational guidance lives in the single [Factory skill](../skills/factory/SKILL.md).
+Original source notices remain in [LICENSE](LICENSE) and
+[developer provenance](../../../docs/product/provenance.md).
+Historical port records live under `docs/developer/factory-history`.

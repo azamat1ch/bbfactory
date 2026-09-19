@@ -574,11 +574,11 @@ describe("builtin plugin reconciliation", () => {
     ]);
   });
 
-  it("ships Workflows enabled on a fresh database", async () => {
+  it("ships Workflows disabled on a fresh database", async () => {
     const workflows = BUILTIN_PLUGINS.find(
       (builtin) => builtin.name === "workflows",
     );
-    expect(workflows?.defaultEnabled).toBe(true);
+    expect(workflows?.defaultEnabled).toBe(false);
 
     service = createService({
       db,
@@ -593,8 +593,8 @@ describe("builtin plugin reconciliation", () => {
       {
         id: "workflows",
         source: "builtin:workflows",
-        enabled: true,
-        status: "running",
+        enabled: false,
+        status: "disabled",
       },
     ]);
   });

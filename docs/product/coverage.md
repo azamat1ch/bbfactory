@@ -228,6 +228,6 @@ protocol behavior and platform limitations must be tested, not assumed equivalen
 
 ## Native guidance implementation evidence
 
-The [Factory guidance port ledger](../../plugins/factory/review/PORT-COVERAGE.md)
+The [Factory guidance port ledger](../developer/factory-history/PORT-COVERAGE.md)
 maps every stable source ID to instruction and local-test evidence. It does not
 claim runtime equivalence or an achieved percentage.

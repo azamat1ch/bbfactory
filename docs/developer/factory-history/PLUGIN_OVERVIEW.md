@@ -1,3 +1,5 @@
+> Historical port record, retained for developer provenance. This is not operational guidance. Current entry point: [Factory](../../../plugins/factory/skills/factory/SKILL.md). Historical paths refer to the original source snapshot in Git.
+
 # Factory Guidance
 
 An internal Factory guidance package that packages the Pragmatic Orchestration guidance,

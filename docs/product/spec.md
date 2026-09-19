@@ -1,7 +1,7 @@
 # bbfactory specification
 
-Status: canonical product direction; see the status map for implemented slices. This consolidates
-the original LifeOS Subscription Team plan and subsequent user corrections.
+Status: repository product direction, not a synchronized task spec. Factory SQLite
+is authoritative for versioned executable specs and acceptance evidence.
 
 ## Outcome
 
@@ -33,9 +33,9 @@ behavior and an honest account of what remains unresolved.
   Devin. Each provider/model appears once; effort and tier configure that entry.
   Keep the lead selector unchanged. Direct work follows the same acceptance
   contract; a separate Execution selector is not required.
-- Pragmatic Orchestration: adapt its useful practices extensively. Use BB's
-  execution facilities first; no commitment to vendoring Porch or translating
-  all of its implementation. Development tools do not define product runtime.
+- Factory skill: preserve useful original practices with one maintained entry
+  point and on-demand references. Factory internalizes existing execution
+  machinery; standalone Workflows is optional and defaults off.
 - UI: normal chat exposes lead, team, available capacity and task/check state.
   Default to the existing BB conversation and native worker activity, with
   compact nested selectors and shared menu motion. Avoid a bespoke drawer or
@@ -70,7 +70,7 @@ communication, supervision, rework, integration and verification. An available
 worker is not automatically a better choice than the lead finishing directly.
 Premium models may implement difficult work as well as plan it.
 
-Use explicit briefs, relevant context links, early direction checks, bounded
+Use explicit briefs, relevant context links, risk-based direction checks, bounded
 progress observations and delta steering. Reuse healthy sessions when supported.
 A retry needs a diagnosis or new information. Silence alone does not prove a
 worker is stuck. Concurrency follows independent scopes, review capacity and
@@ -121,16 +121,16 @@ finite tests is evidence, not proof of zero possible drift.
 
 ## Scope and proof
 
-Target near-complete useful Pragmatic Orchestration behavior, originally
-expressed as 95%+. Map the source inventory to native equivalents and explicit
-gaps before claiming a percentage. Internal file layouts, exit numbers or
-transport shims are not separate customer benefits. Do not remove useful
-behaviors from the denominator merely because they are difficult to implement.
-An independent reviewer must assess the mapping and acceptance evidence.
+Aim to preserve roughly 90–95% of the original guidance's useful behavior, not
+its text or ceremony. The developer mapping records retained, simplified, moved
+and deliberately dropped behavior. Evaluate actual delegation, review, steering
+and recovery, including unnecessary follow-ups, repeated context and checks, and
+human interventions. Do not claim a measured coverage percentage from a source
+inventory.
 
 The product contribution is the integrated policy, native interaction,
 subscription-aware choices and spec-linked verification. BB's existing workflow
-engine and Pragmatic Orchestration's practices remain credited. No novel routing
+engine and original guidance retain required attribution in developer/legal docs. No novel routing
 algorithm or efficiency multiplier has been established.
 
 Compare direct lead execution, fixed delegation and adaptive orchestration on
@@ -209,10 +209,10 @@ siblings. Saved disabled selections must produce an actionable error before a
 new launch, never a silent substitution. Preserve existing running work and
 historical attribution.
 
-The lead makes orchestration decisions using Pragmatic guidance; Factory stores
+The lead makes orchestration decisions using the Factory skill; Factory stores
 the specification, Team preference, proposed assignments and acceptance; BB
 provider infrastructure supplies and enforces eligibility; native threads and
-Workflows execute. Skills guide judgment but cannot replace runtime enforcement.
+Factory's internal execution module execute. Skills guide judgment but cannot replace runtime enforcement.
 Auto filters eligibility first, considers task fit and trustworthy capacity
 observations, then briefly explains consequential choices. Explicit requested
 profiles and counts take precedence over its proposal, within real permission

@@ -8,6 +8,11 @@ bound the subprocesses or memory a worker spawns.
 
 ## Cooperative rules
 
+Before an expensive run, inspect available memory, CPU/load and visible heavy
+jobs on the owning host (for example `free -h`, `uptime` and a bounded process
+listing on Linux). State when observations are unavailable or sandbox-limited.
+Separate worktrees still share that host's CPU and memory.
+
 - **Prefer focused checks.** Run the test file, package filter or targeted
   command that proves the change, not the whole suite. Repeat or broaden only
   for new changes, failures or unresolved concerns.

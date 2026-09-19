@@ -1,3 +1,5 @@
+> Historical port record, retained for developer provenance. This is not operational guidance. Current entry point: [Factory](../../../plugins/factory/skills/factory/SKILL.md). Historical paths refer to the original source snapshot in Git.
+
 # Migration manifest — Pragmatic Orchestration → Factory Guidance
 
 Upstream source: `CodeAlive-AI/pragmatic-orchestration`, pinned at

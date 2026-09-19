@@ -930,7 +930,7 @@ Modal image debugging: `bb modal image build [--json]` prepares the saved image;
 ## Factory
 
 The bundled Factory plugin keeps compatibility ID `factory-team` and combines
-Team preferences, Pragmatic guidance and task/check UI in one feature.
+Team preferences, the Factory skill, native execution and task/check UI in one package.
 Team Auto / Off / Selected appears in normal chat. Use `bb factory team get --json` and `bb factory team set --mode auto|off|selected
 [--profiles '<JSON array>'] [--revision <n>] --json`. Scope defaults to the current
 thread; pass `--thread <id>` or `--project <id>` for an explicit conversation or
