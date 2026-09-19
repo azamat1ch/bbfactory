@@ -426,30 +426,39 @@ it.each([
     "Sign in to this account in the source plugin’s settings.",
   ],
   ["no-limits", "No usage limits reported for this plan."],
+  ["unmeasured", "Not measured yet."],
+  ["unsupported", "Limits unavailable."],
+  ["unsupported-offline", "Review pool is offline."],
   [
     "source-error",
     "Couldn’t refresh usage. Showing the last available update.",
   ],
 ] as const)("renders the %s shared-source state", async (state, expected) => {
   const usage: UsageProvider["usage"] =
-    state === "expired" || state === "unauthenticated"
-      ? { status: state }
-      : {
-          status: "ok",
-          accountEmail: "review@example.com",
-          planLabel: null,
-          windows:
-            state === "no-limits"
-              ? []
-              : [
-                  {
-                    label: "Weekly limit",
-                    usedPercent: 42,
-                    resetsAt: null,
-                    cost: null,
-                  },
-                ],
-        };
+    state === "unsupported-offline"
+      ? { status: "unsupported" }
+      : state === "unmeasured"
+        ? null
+        : state === "expired" ||
+            state === "unauthenticated" ||
+            state === "unsupported"
+          ? { status: state }
+          : {
+              status: "ok",
+              accountEmail: "review@example.com",
+              planLabel: null,
+              windows:
+                state === "no-limits"
+                  ? []
+                  : [
+                      {
+                        label: "Weekly limit",
+                        usedPercent: 42,
+                        resetsAt: null,
+                        cost: null,
+                      },
+                    ],
+            };
   const account: UsageProvider = {
     id: "account",
     providerId: "codex",
@@ -472,7 +481,8 @@ it.each([
             {
               id: "source:pool",
               displayName: "Review pool",
-              status: "connected",
+              status:
+                state === "unsupported-offline" ? "disconnected" : "connected",
               providers: state === "empty" ? [] : [account],
               error: state === "source-error" ? "private backend error" : null,
             },
@@ -491,6 +501,11 @@ it.each([
   await waitFor(() =>
     expect(slot.getByText(expected, { exact: false })).toBeTruthy(),
   );
+  if (state === "unsupported-offline") {
+    expect(slot.getByText("Limits unavailable.")).toBeTruthy();
+    expect(slot.queryByText(/last available update/)).toBeNull();
+    expect(slot.queryByText(/will refresh when it reconnects/)).toBeNull();
+  }
   if (state === "source-error") {
     expect(slot.getByText("42%")).toBeTruthy();
     expect(slot.queryByText("private backend error")).toBeNull();

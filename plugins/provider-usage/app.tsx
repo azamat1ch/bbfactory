@@ -229,7 +229,7 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
 function ProviderUsageBody({ provider }: { provider: UsageProvider }) {
   const usage = provider.usage;
   if (usage === null) {
-    return <p className="text-xs text-muted-foreground">Usage not reported.</p>;
+    return <p className="text-xs text-muted-foreground">Not measured yet.</p>;
   }
   switch (usage.status) {
     case "ok":
@@ -257,6 +257,10 @@ function ProviderUsageBody({ provider }: { provider: UsageProvider }) {
     case "expired":
       return (
         <p className="text-xs text-muted-foreground">{provider.expiredHint}</p>
+      );
+    case "unsupported":
+      return (
+        <p className="text-xs text-muted-foreground">Limits unavailable.</p>
       );
     case "error":
       return <p className="text-xs text-muted-foreground">{usage.message}</p>;
@@ -402,7 +406,7 @@ export function ProviderUsageStatusContent({
           ? usageFeedbackMessages.loading
           : usageFeedbackMessages.noSources
       : activeMachine.status === "disconnected"
-        ? offlineUsageMessage(activeMachine, hasActiveUsage)
+        ? offlineUsageMessage(activeMachine, activeAccounts)
         : snapshot.error !== null || activeMachine.error !== null
           ? hasActiveUsage
             ? usageFeedbackMessages.refreshFailed

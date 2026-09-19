@@ -325,7 +325,7 @@ function ProviderUsageBody({
   if (!usage) {
     return (
       <p className="text-xs text-muted-foreground">
-        {isLoading ? "Loading usage…" : "Usage not provided."}
+        {isLoading ? "Loading usage…" : "Not measured yet."}
       </p>
     );
   }
@@ -359,6 +359,10 @@ function ProviderUsageBody({
       return (
         <p className="text-xs text-muted-foreground">{config.expiredHint}</p>
       );
+    case "unsupported":
+      return (
+        <p className="text-xs text-muted-foreground">Limits unavailable.</p>
+      );
     case "error":
       return <p className="text-xs text-muted-foreground">{usage.message}</p>;
     default:
@@ -391,7 +395,7 @@ export function UsageSettingsContent({
   }
   const notice =
     selected?.status === "disconnected"
-      ? offlineUsageMessage(selected, hasReportedUsage(selected.providers))
+      ? offlineUsageMessage(selected, selected.providers)
       : error || selected?.error
         ? hasReportedUsage(selected?.providers ?? [])
           ? usageFeedbackMessages.refreshFailed

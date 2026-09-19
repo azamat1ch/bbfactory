@@ -27,6 +27,7 @@ type ScenarioName =
   | "offline"
   | "authentication"
   | "missingProvider"
+  | "noUsageSource"
   | "failedRefresh";
 
 function futureIso(hours: number): string {
@@ -135,6 +136,27 @@ const scenarios: Record<Exclude<ScenarioName, "loading">, UsageSnapshot> = {
       ]),
     ],
   },
+  noUsageSource: {
+    machines: [
+      machine("host-m4", "Michael-M4", [
+        provider(
+          "local-codex",
+          "codex",
+          measured("local@example.com", 17, "Pro"),
+        ),
+        {
+          ...provider("pending", "claude-code", null),
+          accountLabel: null,
+        },
+        {
+          ...provider("inventory", "acp-devin", { status: "unsupported" }),
+          displayName: "Devin",
+          logoUrl: null,
+          accountLabel: null,
+        },
+      ]),
+    ],
+  },
   failedRefresh: {
     machines: [
       machine("source:account-pool", "Account Pooler", [
@@ -192,6 +214,8 @@ const descriptions: Record<ScenarioName, string> = {
   offline: "The selected persistent machine is currently disconnected.",
   authentication: "Signed-out and expired accounts remain distinct.",
   missingProvider: "The selected machine does not have the provider installed.",
+  noUsageSource:
+    "A registered provider without a usage source reads Limits unavailable, distinct from an unmeasured resource.",
   failedRefresh:
     "The latest refresh failed while cached measurements remain visible.",
 };
@@ -203,6 +227,7 @@ const storyRows: readonly { label: string; scenario: ScenarioName }[] = [
   { label: "offline machine", scenario: "offline" },
   { label: "authentication", scenario: "authentication" },
   { label: "missing provider", scenario: "missingProvider" },
+  { label: "no usage source", scenario: "noUsageSource" },
   { label: "failed refresh", scenario: "failedRefresh" },
 ];
 
