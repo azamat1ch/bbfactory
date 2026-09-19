@@ -34,6 +34,7 @@ function fixture(): FactoryTaskDetail {
       {
         id: "BOOK-1",
         text: "Exactly one concurrent booking succeeds",
+        verificationMethods: [],
         criterion: "automated" as const,
         reviewInstructions: "",
         artifactRefs: [],
@@ -41,6 +42,7 @@ function fixture(): FactoryTaskDetail {
       {
         id: "VISUAL",
         text: "The waitlist message is clear",
+        verificationMethods: [],
         criterion: "human" as const,
         reviewInstructions: "Check the waitlist copy on mobile.",
         artifactRefs: ["https://example.com/waitlist.png", "docs/waitlist.md"],
@@ -48,6 +50,7 @@ function fixture(): FactoryTaskDetail {
       {
         id: "COPY",
         text: "Confirmation email states the place",
+        verificationMethods: [],
         criterion: "human" as const,
         reviewInstructions: "",
         artifactRefs: [],
@@ -55,6 +58,7 @@ function fixture(): FactoryTaskDetail {
       {
         id: "AGENT-1",
         text: "Locking is race-free under retries",
+        verificationMethods: [],
         criterion: "agent" as const,
         reviewInstructions: "Inspect the transaction boundaries.",
         artifactRefs: [],
@@ -62,6 +66,7 @@ function fixture(): FactoryTaskDetail {
       {
         id: "UNMAPPED",
         text: "Cancellation restores availability",
+        verificationMethods: [],
         criterion: "automated" as const,
         reviewInstructions: "",
         artifactRefs: [],
@@ -79,7 +84,11 @@ function fixture(): FactoryTaskDetail {
     checks: [check],
   };
   return {
+    invalidatedEvidenceIds: [],
+    approvals: [],
+    deliveries: [],
     task: {
+      executionRunning: false,
       ...spec,
       id: "task-1",
       projectId: "project-1",
@@ -191,6 +200,7 @@ function bulkFixture(count = 100): FactoryTaskDetail {
   const requirements = Array.from({ length: count }, (_, i) => ({
     id: `R-${i + 1}`,
     text: `Requirement number ${i + 1} holds`,
+    verificationMethods: [],
     criterion:
       i % 10 === 9
         ? ("human" as const)
@@ -291,7 +301,7 @@ describe("Factory task evidence", () => {
       await slot.findByRole("heading", { name: detail.task.goal });
       fireEvent.click(slot.getByRole("button", { name: "Run checks" }));
       await waitFor(() => expect(verify).toHaveBeenCalledTimes(1));
-      const stopButton = slot.getByRole("button", { name: "Stop" });
+      const stopButton = slot.getByRole("button", { name: "Cancel" });
       expect(stopButton.hasAttribute("disabled")).toBe(false);
       fireEvent.click(stopButton);
       fireEvent.click(stopButton);
@@ -364,7 +374,7 @@ describe("Factory task evidence", () => {
       expect(slot.queryByText("All checks passed.")).toBeNull();
       expect(slot.getByText("Verification stopped.")).toBeTruthy();
       expect(slot.queryByRole("button", { name: "Run checks" })).toBeNull();
-      expect(slot.getByRole("button", { name: "Retry stop" })).toBeTruthy();
+      expect(slot.getByRole("button", { name: "Resume task" })).toBeTruthy();
     },
   );
 
@@ -449,125 +459,134 @@ describe("Factory task evidence", () => {
     ).toBeTruthy();
   });
 
-  it("guides grouped human review through one explicit bulk acceptance", async () => {
-    const detail = fixture();
-    const judge = vi.fn(async () => detail);
-    const slot = mount(detail, { factoryRecordJudgments: judge });
+  it("preserves matching evidence after cancellation and never revives invalidated evidence", async () => {
+    let detail = fixture();
+    detail.findings = [];
+    detail.task.stopRequested = true;
+    detail.evidence[0] = {
+      ...detail.evidence[0]!,
+      specVersion: 2,
+      content: detail.observedContent!,
+    };
+    const slot = mount(detail, { factoryGetTask: () => detail });
     await slot.findByRole("heading", { name: detail.task.goal });
-    expect(slot.getByLabelText("Acceptance by method").textContent).toBe(
-      "Check 0/2 · Agent 0/1 · Human 0/2 accepted",
-    );
-    fireEvent.click(
-      within(slot.container.querySelector(".factory-review")!).getByRole(
-        "link",
-        { name: "docs/waitlist.md" },
-      ),
-    );
-    expect(slot.navigateCalls).toContainEqual({
-      method: "experimental_openFilePreview",
-      options: {
-        target: {
-          kind: "workspace",
-          environmentId: "env-1",
-          path: "docs/waitlist.md",
-        },
-        location: null,
-      },
-    });
     expect(
-      within(slot.container.querySelector(".factory-review")!).getByText(
-        "Check the waitlist copy on mobile.",
-      ),
+      slot.getByText("1 accepted · 0 failed · 0 stale · 4 unverified"),
     ).toBeTruthy();
-    expect(
-      within(slot.container.querySelector(".factory-review")!).getByText(
-        "https://example.com/waitlist.png",
-      ),
-    ).toBeTruthy();
-    expect(
-      within(slot.container.querySelector(".factory-review")!).getByText(
-        "docs/waitlist.md",
-      ),
-    ).toBeTruthy();
-    expect(slot.queryByRole("checkbox", { name: /personally/i })).toBeNull();
-    const accept = slot.getByRole("button", { name: "Accept selected" });
-    expect(accept.hasAttribute("disabled")).toBe(true);
-    fireEvent.click(
-      slot.getByRole("checkbox", { name: /waitlist message is clear/i }),
-    );
-    fireEvent.click(
-      slot.getByRole("checkbox", { name: /Confirmation email states/i }),
-    );
-    fireEvent.click(slot.getByRole("button", { name: "Accept 2 selected" }));
-    await waitFor(() =>
-      expect(judge).toHaveBeenCalledWith({
-        taskId: "task-1",
-        requirementIds: ["VISUAL", "COPY"],
-        accepted: true,
-        actor: "User",
-        rationale: "",
-        humanConfirmed: true,
-        expectedVersion: 2,
-        expectedFingerprint: "current-content-sha",
-      }),
-    );
+    detail = { ...detail, invalidatedEvidenceIds: [detail.evidence[0]!.id] };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("0 accepted · 0 failed · 1 stale · 4 unverified");
   });
 
-  it("requests changes only with notes and drops stale selection after a spec change", async () => {
+  it("requires every configured method and exposes combined-method filters", async () => {
     let detail = fixture();
-    const judge = vi.fn(async () => detail);
-    const slot = mount(detail, {
-      factoryGetTask: () => detail,
-      factoryRecordJudgments: judge,
-    });
+    detail.findings = [];
+    detail.task.requirements[0]!.verificationMethods = ["automated", "human"];
+    detail.evidence[0] = {
+      ...detail.evidence[0]!,
+      specVersion: 2,
+      content: detail.observedContent!,
+    };
+    const slot = mount(detail, { factoryGetTask: () => detail });
     await slot.findByRole("heading", { name: detail.task.goal });
-    const visual = slot.getByRole("checkbox", {
-      name: /waitlist message is clear/i,
+    expect(
+      slot.getByText("0 accepted · 0 failed · 0 stale · 5 unverified"),
+    ).toBeTruthy();
+    fireEvent.change(slot.getByLabelText("Filter by method"), {
+      target: { value: "human" },
     });
-    fireEvent.click(visual);
-    const request = slot.getByRole("button", { name: "Request changes" });
-    expect(request.hasAttribute("disabled")).toBe(true);
-    fireEvent.change(slot.getByLabelText("Review notes"), {
-      target: { value: "The waitlist copy is truncated." },
-    });
-    expect(request.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(request);
-    await waitFor(() =>
-      expect(judge).toHaveBeenCalledWith({
-        taskId: "task-1",
-        requirementIds: ["VISUAL"],
-        accepted: false,
-        actor: "User",
-        rationale: "The waitlist copy is truncated.",
-        humanConfirmed: true,
-        expectedVersion: 2,
-        expectedFingerprint: "current-content-sha",
-      }),
-    );
-    fireEvent.click(
-      slot.getByRole("checkbox", { name: /waitlist message is clear/i }),
-    );
+    expect(slot.getByText("Check + Human")).toBeTruthy();
     detail = {
       ...detail,
-      task: { ...detail.task, specVersion: 3 },
-      specs: [
-        ...detail.specs,
+      judgments: [
         {
-          version: 3,
-          spec: detail.specs[1]!.spec,
-          changeReason: "Copy tweaks",
+          id: "j1",
+          taskId: "task-1",
+          requirementId: "BOOK-1",
+          specVersion: 2,
+          fingerprint: "current-content-sha",
+          actor: "User",
+          rationale: "",
+          accepted: true,
           createdAt: 5000,
         },
       ],
     };
-    await slot.emitRealtime("factory-tasks", { taskId: "task-1" });
-    await waitFor(() => expect(slot.getByText("Spec v3")).toBeTruthy());
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("1 accepted · 0 failed · 0 stale · 4 unverified");
+  });
+
+  it("approves exact selections across pages and filters without a rationale form", async () => {
+    const detail = bulkFixture(100);
+    const approve = vi.fn(async () => detail);
+    const slot = mount(detail, { factoryApproveDelivery: approve });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    fireEvent.click(slot.getByRole("checkbox", { name: /^Select R-1:/ }));
+    fireEvent.click(slot.getByRole("button", { name: /Next/ }));
+    fireEvent.click(slot.getByRole("checkbox", { name: /^Select R-13:/ }));
+    fireEvent.change(slot.getByLabelText("Search requirements"), {
+      target: { value: "number 99" },
+    });
+    expect(slot.getByText("Selected requirements (2): R-1, R-13")).toBeTruthy();
+    expect(slot.queryByLabelText("Review notes")).toBeNull();
+    fireEvent.click(slot.getByRole("button", { name: "Approve selected" }));
+    await waitFor(() =>
+      expect(approve).toHaveBeenCalledExactlyOnceWith({
+        taskId: "task-1",
+        expectedVersion: 2,
+        expectedFingerprint: "current-content-sha",
+        scope: "selected",
+        requirementIds: ["R-1", "R-13"],
+        accepted: true,
+        actor: "User",
+        humanConfirmed: true,
+        source: "ui",
+        sourceRef: null,
+        rationale: "",
+      }),
+    );
+  });
+
+  it("approves delivery with explicit whole-task scope despite active filters", async () => {
+    const detail = fixture();
+    const approve = vi.fn(async () => detail);
+    const slot = mount(detail, { factoryApproveDelivery: approve });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    fireEvent.change(slot.getByLabelText("Filter by method"), {
+      target: { value: "human" },
+    });
     expect(
-      slot
-        .getByRole("button", { name: "Accept selected" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-    expect(judge).toHaveBeenCalledTimes(1);
+      slot.getByText("Delivery approval · all 5 requirements · spec v2"),
+    ).toBeTruthy();
+    fireEvent.click(slot.getByRole("button", { name: "Approve" }));
+    await waitFor(() =>
+      expect(approve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: "delivery",
+          requirementIds: [],
+          rationale: "",
+        }),
+      ),
+    );
+    expect(
+      slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
+    ).toBeTruthy();
+  });
+
+  it("clears selected approval scope after a specification change", async () => {
+    let detail = fixture();
+    const slot = mount(detail, { factoryGetTask: () => detail });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    fireEvent.click(
+      slot.getByRole("checkbox", { name: /waitlist message is clear/i }),
+    );
+    detail = { ...detail, task: { ...detail.task, specVersion: 3 } };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("Spec v3");
+    expect(slot.queryByRole("button", { name: "Approve selected" })).toBeNull();
+    expect(
+      slot.getByText("Delivery approval · all 5 requirements · spec v3"),
+    ).toBeTruthy();
   });
 
   it("sends an agent review request through the composer with ids and context", async () => {
@@ -592,7 +611,7 @@ describe("Factory task evidence", () => {
     );
     expect(
       slot
-        .getByRole("button", { name: "Accept 1 selected" })
+        .getByRole("button", { name: "Approve selected" })
         .hasAttribute("disabled"),
     ).toBe(false);
     detail = {
@@ -606,10 +625,8 @@ describe("Factory task evidence", () => {
     await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
     await slot.findByText("Result B");
     expect(
-      slot
-        .getByRole("button", { name: "Accept selected" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+      slot.getByRole("button", { name: "Approve" }).hasAttribute("disabled"),
+    ).toBe(false);
     detail = {
       ...detail,
       task: { ...detail.task, statusDetail: "Result A restored" },
@@ -620,11 +637,10 @@ describe("Factory task evidence", () => {
     };
     await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
     await slot.findByText("Result A restored");
+    expect(slot.queryByRole("button", { name: "Approve selected" })).toBeNull();
     expect(
-      slot
-        .getByRole("button", { name: "Accept selected" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+      slot.getByRole("button", { name: "Approve" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("preserves expanded requirements across pages and live updates", async () => {
@@ -681,7 +697,7 @@ describe("Factory task evidence", () => {
     );
   });
 
-  it("keeps review actions out of a stopped task and suppresses green", async () => {
+  it("keeps review actions out of a stopped task", async () => {
     const detail = fixture();
     detail.task.stopRequested = true;
     const judge = vi.fn(async () => detail);
@@ -710,9 +726,7 @@ describe("Factory task evidence", () => {
     });
     expect(checkbox.hasAttribute("disabled")).toBe(true);
     expect(
-      slot
-        .getByRole("button", { name: "Accept selected" })
-        .hasAttribute("disabled"),
+      slot.getByRole("button", { name: "Approve" }).hasAttribute("disabled"),
     ).toBe(true);
     expect(judge).not.toHaveBeenCalled();
     expect(
@@ -803,40 +817,28 @@ describe("Factory task evidence", () => {
     ).toBe(false);
   });
 
-  it("shows proposed team separately from actual native assignments", async () => {
+  it("keeps scope readable and duplicate agent panels out of the card", async () => {
     const detail = fixture();
-    detail.task = {
-      ...detail.task,
-      teamPlan: [
-        {
-          id: "plan-1",
-          title: "Booking fix implementer",
-          role: "implement" as const,
-          profile: {
-            providerId: "codex",
-            model: "sol",
-            reasoningLevel: "high" as const,
-            serviceTier: "default" as const,
-          },
-          requirementIds: ["BOOK-1"],
-          rationale: "Owns the locking change.",
-        },
-      ],
-    };
+    detail.task.requirements[0]!.text = "Long domain requirement ".repeat(80);
     const slot = mount(detail);
     await slot.findByRole("heading", { name: detail.task.goal });
-    openSummary(slot, "Proposed team");
-    expect(slot.getByText("Booking fix implementer")).toBeTruthy();
+    expect(slot.getByRole("region", { name: "Scope" }).textContent).toContain(
+      detail.task.scope,
+    );
+    expect(slot.queryByText("Proposed team")).toBeNull();
+    expect(slot.queryByRole("heading", { name: "Assignments" })).toBeNull();
     expect(
-      slot.getByText(/Proposal only — actual work appears under Assignments/),
-    ).toBeTruthy();
-    expect(slot.getByText("completed")).toBeTruthy();
-    openSummary(slot, "Booking concurrency");
-    fireEvent.click(slot.getByRole("button", { name: "Open native thread" }));
-    expect(slot.navigateCalls).toContainEqual({
-      method: "toThread",
-      threadId: "worker-1",
-    });
+      slot.container.querySelector(".factory-requirement-text")!.textContent,
+    ).toBe(detail.task.requirements[0]!.text);
+    expect(
+      slot.container.querySelector(".factory-requirements-heading")!
+        .textContent,
+    ).toContain("Coverage");
+    expect(
+      slot.container
+        .querySelector(".factory-requirement")!
+        .hasAttribute("open"),
+    ).toBe(false);
   });
 
   it("renders versioned notes with artifacts and salient conclusions", async () => {
@@ -872,33 +874,78 @@ describe("Factory task evidence", () => {
     expect(slot.getByText("Watching flaky retries.")).toBeTruthy();
   });
 
-  it("links native work, preserves the chat draft and sends stop through the real RPC", async () => {
-    const detail = fixture();
-    const stop = vi.fn(async () => ({
-      ...detail,
-      task: { ...detail.task, stopRequested: true },
-    }));
-    const slot = mount(detail, { factoryCancelTask: stop });
-    await slot.findByRole("heading", { name: detail.task.goal });
-    openSummary(slot, "Booking concurrency");
-    fireEvent.click(slot.getByRole("button", { name: "Open native thread" }));
-    expect(slot.navigateCalls).toContainEqual({
-      method: "toThread",
-      threadId: "worker-1",
+  it("cancels only running execution and exposes explicit resume for legacy stops", async () => {
+    let detail = fixture();
+    const stop = vi.fn(async () => {
+      detail = {
+        ...detail,
+        task: { ...detail.task, executionRunning: false, stopRequested: true },
+      };
+      return detail;
     });
+    const resume = vi.fn(async () => ({
+      ...detail,
+      task: { ...detail.task, stopRequested: false },
+    }));
+    const slot = mount(detail, {
+      factoryGetTask: () => detail,
+      factoryCancelTask: stop,
+      factoryResumeTask: resume,
+    });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    expect(slot.queryByRole("button", { name: "Cancel" })).toBeNull();
+    detail = { ...detail, task: { ...detail.task, executionRunning: true } };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    fireEvent.click(await slot.findByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(stop).toHaveBeenCalledWith({ taskId: "task-1", archive: false }),
+    );
+    fireEvent.click(await slot.findByRole("button", { name: "Resume task" }));
+    await waitFor(() =>
+      expect(resume).toHaveBeenCalledWith({
+        taskId: "task-1",
+        expectedVersion: 2,
+      }),
+    );
+    expect(slot.queryByRole("button", { name: "Cancel" })).toBeNull();
     fireEvent.click(slot.getByRole("button", { name: "Request edits" }));
     expect(slot.composer.text).toContain("Keep this draft");
     expect(slot.composer.quotes[0]).toContain("task-1, spec v2");
     expect(slot.composer.submits).toEqual([]);
-    fireEvent.click(slot.getByRole("button", { name: "Stop" }));
-    await waitFor(() =>
-      expect(stop).toHaveBeenCalledWith({ taskId: "task-1", archive: false }),
-    );
-    await slot.findByRole("button", { name: "Retry stop" });
+  });
+
+  it("retains Delivered history when current workspace coverage changes", async () => {
+    let detail = fixture();
+    detail.deliveries = [
+      {
+        id: "d1",
+        taskId: "task-1",
+        specVersion: 1,
+        content: detail.evidence[0]!.content,
+        mergeUrl: "https://example.com/pull/1",
+        status: "delivered",
+        verificationStatus: "accepted",
+        createdAt: 3000,
+      },
+    ];
+    const slot = mount(detail, { factoryGetTask: () => detail });
+    await slot.findByRole("heading", { name: detail.task.goal });
+    expect(slot.getByText("Delivered")).toBeTruthy();
+    openSummary(slot, "Historical snapshots (1)");
+    expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
     expect(
-      slot.getByText(
-        "Stop requested. Native assignment status below records the outcome.",
-      ),
+      slot.getByRole("link", { name: "https://example.com/pull/1" }),
+    ).toBeTruthy();
+    detail = {
+      ...detail,
+      task: { ...detail.task, specVersion: 3, statusDetail: "Later workspace" },
+    };
+    await slot.emitRealtime("factory-tasks", { taskId: detail.task.id });
+    await slot.findByText("Spec v3");
+    expect(slot.getByText("Delivered")).toBeTruthy();
+    expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
+    expect(
+      slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
     ).toBeTruthy();
   });
 

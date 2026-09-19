@@ -1,7 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@bb/shared-ui/button";
-import { Icon } from "@bb/shared-ui/icon";
-import { useBbNavigate, useComposer, useRpc } from "@get-bb/plugin-sdk/app";
+import { useComposer, useRpc } from "@get-bb/plugin-sdk/app";
 import type { FactoryTaskDetail, factoryRpcContract } from "./shared.js";
 import {
   ArtifactList,
@@ -16,6 +15,7 @@ import { HumanReviewPanel } from "./app-review.js";
 import {
   currentFingerprint,
   requirementStatus,
+  reviewMethods,
   specDelta,
 } from "./app-status.js";
 
@@ -102,61 +102,6 @@ function FindingRow({
   );
 }
 
-function TeamPlan({ detail }: { detail: FactoryTaskDetail }) {
-  const plan = detail.task.teamPlan;
-  return (
-    <details className="factory-section">
-      <summary>
-        <h3>Proposed team</h3>
-        <span className="factory-meta">
-          {plan.length ? `${plan.length} proposed` : "None proposed"}
-        </span>
-      </summary>
-      {plan.length === 0 ? (
-        <p className="factory-note">No team proposal in this spec.</p>
-      ) : (
-        <>
-          <p className="factory-note">
-            Proposal only — actual work appears under Assignments.
-          </p>
-          <div className="factory-group">
-            {plan.map((item) => (
-              <details className="factory-assignment" key={item.id}>
-                <summary>
-                  <span className="factory-grow">
-                    {item.title}
-                    <span className="factory-meta factory-block">
-                      {item.role} · {item.profile.providerId}/
-                      {item.profile.model} · {item.requirementIds.length}{" "}
-                      {item.requirementIds.length === 1
-                        ? "requirement"
-                        : "requirements"}
-                    </span>
-                  </span>
-                </summary>
-                <div className="factory-inset">
-                  {item.rationale && (
-                    <p className="factory-note">{item.rationale}</p>
-                  )}
-                  <dl className="factory-properties">
-                    <dt>Profile</dt>
-                    <dd>
-                      {item.profile.providerId} · {item.profile.model} ·{" "}
-                      {item.profile.reasoningLevel} · {item.profile.serviceTier}
-                    </dd>
-                    <dt>Requirements</dt>
-                    <dd>{item.requirementIds.join(" · ") || "None"}</dd>
-                  </dl>
-                </div>
-              </details>
-            ))}
-          </div>
-        </>
-      )}
-    </details>
-  );
-}
-
 function Notes({ detail }: { detail: FactoryTaskDetail }) {
   const notes = [...detail.notes].sort((a, b) => b.createdAt - a.createdAt);
   const kindLabel = {
@@ -165,11 +110,9 @@ function Notes({ detail }: { detail: FactoryTaskDetail }) {
     blocker: "Blocker",
     conclusion: "Conclusion",
   } as const;
+  if (!notes.length) return null;
   return (
-    <details
-      className="factory-section"
-      open={notes.some((note) => note.kind === "conclusion")}
-    >
+    <details className="factory-section">
       <summary>
         <h3>Notes &amp; artifacts</h3>
         <span className="factory-meta">{notes.length || "None"}</span>
@@ -286,7 +229,6 @@ export function TaskDetail({
   unavailable: boolean;
 }) {
   const rpc = useRpc<typeof factoryRpcContract>();
-  const navigate = useBbNavigate();
   const composer = useComposer();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -329,10 +271,22 @@ export function TaskDetail({
   const active = task.phase === "active";
   const agentPending = task.requirements.filter(
     (requirement) =>
-      requirement.criterion === "agent" &&
+      reviewMethods(requirement).includes("agent") &&
       requirementStatus(requirement, detail) !== "accepted",
   );
   const fingerprint = currentFingerprint(detail);
+  const identity = `${task.id}:${task.specVersion}:${fingerprint ?? "unknown"}`;
+  const [selection, setSelection] = useState<{
+    identity: string;
+    ids: string[];
+  }>({ identity, ids: [] });
+  useEffect(() => {
+    setSelection((previous) =>
+      previous.identity === identity ? previous : { identity, ids: [] },
+    );
+  }, [identity]);
+  const selected = selection.identity === identity ? selection.ids : [];
+  const clearSelection = () => setSelection({ identity, ids: [] });
   const statusLine = unavailable
     ? "Live updates are unavailable. Records below may be out of date."
     : error
@@ -365,11 +319,42 @@ export function TaskDetail({
           )}
         </header>
         <h2>{task.goal}</h2>
-        <p className="factory-status-detail">{statusLine}</p>
+        {detail.deliveries.length > 0 && (
+          <section
+            className="factory-delivery"
+            aria-label="Historical delivery"
+          >
+            <strong>Delivered</strong>
+            <details>
+              <summary>
+                Historical snapshots ({detail.deliveries.length})
+              </summary>
+              {detail.deliveries.map((delivery) => (
+                <div className="factory-note" key={delivery.id}>
+                  <p>
+                    Spec v{delivery.specVersion} · {time(delivery.createdAt)}
+                  </p>
+                  <p className="factory-mono">{delivery.content.fingerprint}</p>
+                  <p>Coverage at delivery: {delivery.verificationStatus}</p>
+                  {delivery.mergeUrl && (
+                    <ArtifactList
+                      refs={[delivery.mergeUrl]}
+                      environmentId={task.environmentId}
+                    />
+                  )}
+                </div>
+              ))}
+            </details>
+            <p className="factory-meta">
+              Current workspace coverage is shown below.
+            </p>
+          </section>
+        )}
+        {statusLine && <p className="factory-status-detail">{statusLine}</p>}
         {error && <ErrorNotice text={error} />}
         {task.stopRequested && (
           <p className="factory-note">
-            Stop requested. Native assignment status below records the outcome.
+            Execution stopped. Recorded evidence remains available.
           </p>
         )}
         {(task.problem || task.outcome) && (
@@ -388,16 +373,10 @@ export function TaskDetail({
             )}
           </div>
         )}
-        <details className="factory-section">
-          <summary>
-            <h3>Scope</h3>
-            <span className="factory-meta">Target workspace</span>
-          </summary>
+        <section className="factory-scope-section" aria-label="Scope">
+          <h3>Scope</h3>
           <p className="factory-scope">{task.scope}</p>
-          <p className="factory-meta factory-mono">
-            {detail.observedContent?.canonicalPath ?? task.environmentId}
-          </p>
-        </details>
+        </section>
         {draft && (
           <section className="factory-stage">
             <div className="factory-check-heading">
@@ -445,124 +424,97 @@ export function TaskDetail({
           <h3>Requirements</h3>
           <span className="factory-meta">{task.requirements.length}</span>
         </div>
-        <RequirementNavigator detail={detail} />
+        <RequirementNavigator
+          detail={detail}
+          selected={selected}
+          selectionDisabled={busy !== null || unavailable || !fingerprint}
+          onSelectionChange={(ids) => setSelection({ identity, ids })}
+        />
         <HumanReviewPanel
           key={`${task.specVersion}:${fingerprint ?? "unknown"}`}
           detail={detail}
+          selected={selected}
+          clearSelection={clearSelection}
           busy={busy !== null || unavailable}
           run={run}
         />
-        <details className="factory-section" open={blocked > 0}>
-          <summary>
-            <h3>Review findings</h3>
-            <span className="factory-meta">
-              {blocked
-                ? `${blocked} blocking`
-                : detail.findings.length || "None recorded"}
-            </span>
-          </summary>
-          <div className="factory-group">
-            {detail.findings.map((finding) => (
-              <FindingRow
-                key={finding.id}
-                finding={finding}
-                taskId={task.id}
-                busy={busy !== null || unavailable || task.archived}
-                run={run}
-              />
-            ))}
-            {!detail.findings.length && (
-              <p className="factory-note">No review findings recorded.</p>
-            )}
-          </div>
-        </details>
-        <TeamPlan detail={detail} />
-        <details
-          className="factory-section"
-          open={detail.assignments.length > 0}
-        >
-          <summary>
-            <h3>Assignments</h3>
-            <span className="factory-meta">
-              {detail.assignments.length || "Direct work"}
-            </span>
-          </summary>
-          {detail.assignments.length === 0 ? (
-            <p className="factory-note">
-              No delegated assignments. The same acceptance checks apply to
-              direct work.
-            </p>
-          ) : (
+        {detail.findings.length > 0 && (
+          <details className="factory-section" open={blocked > 0}>
+            <summary>
+              <h3>Review findings</h3>
+              <span className="factory-meta">
+                {blocked
+                  ? `${blocked} blocking`
+                  : detail.findings.length || "None recorded"}
+              </span>
+            </summary>
             <div className="factory-group">
-              {detail.assignments.map((assignment) => (
-                <details className="factory-assignment" key={assignment.id}>
-                  <summary>
-                    <span className="factory-grow">
-                      {assignment.title}
-                      <span className="factory-meta factory-block">
-                        {assignment.role} · {assignment.profile.model}
-                      </span>
-                    </span>
-                    <span className="factory-meta">
-                      {assignment.nativeStatus || "Status unknown"}
-                    </span>
-                  </summary>
-                  <div className="factory-inset">
-                    <p className="factory-note">{assignment.scope}</p>
-                    <dl className="factory-properties">
-                      <dt>Provider</dt>
-                      <dd>
-                        {assignment.profile.providerId} ·{" "}
-                        {assignment.profile.reasoningLevel} ·{" "}
-                        {assignment.profile.serviceTier}
-                      </dd>
-                      <dt>Environment</dt>
-                      <dd>{assignment.environmentId}</dd>
-                      <dt>Ownership</dt>
-                      <dd>{assignment.ownership}</dd>
-                      <dt>Access</dt>
-                      <dd>{assignment.permissionMode}</dd>
-                      <dt>Native run</dt>
-                      <dd className="factory-mono">
-                        {assignment.runId ?? "Not linked"}
-                      </dd>
-                      <dt>Preference</dt>
-                      <dd>
-                        Revision {assignment.preferenceRevision}
-                        {assignment.overrideReason
-                          ? ` · ${assignment.overrideReason}`
-                          : ""}
-                      </dd>
-                    </dl>
-                    {assignment.error && (
-                      <p className="factory-error">{assignment.error}</p>
-                    )}
-                    {assignment.threadId ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate.toThread(assignment.threadId!)}
-                      >
-                        Open native thread
-                        <Icon name="ArrowUpRight" className="size-3" />
-                      </Button>
-                    ) : (
-                      <p className="factory-note">
-                        No native thread linked yet.
-                      </p>
-                    )}
-                  </div>
-                </details>
+              {detail.findings.map((finding) => (
+                <FindingRow
+                  key={finding.id}
+                  finding={finding}
+                  taskId={task.id}
+                  busy={busy !== null || unavailable || task.archived}
+                  run={run}
+                />
               ))}
+              {!detail.findings.length && (
+                <p className="factory-note">No review findings recorded.</p>
+              )}
             </div>
-          )}
-        </details>
+          </details>
+        )}
         <Notes detail={detail} />
+        {detail.approvals.length > 0 && (
+          <details className="factory-section">
+            <summary>
+              <h3>Approval history</h3>
+              <span className="factory-meta">{detail.approvals.length}</span>
+            </summary>
+            {detail.approvals.map((approval) => (
+              <div className="factory-note" key={approval.id}>
+                <strong>
+                  {approval.accepted ? "Approved" : "Changes requested"} ·{" "}
+                  {approval.scope === "delivery"
+                    ? "Delivery"
+                    : "Selected requirements"}{" "}
+                  · v{approval.specVersion}
+                </strong>
+                <p>{approval.requirementIds.join(", ")}</p>
+                {approval.rationale && <p>{approval.rationale}</p>}
+                <span className="factory-meta">
+                  {approval.actor} · {approval.source} ·{" "}
+                  {time(approval.createdAt)}
+                </span>
+                {approval.sourceRef && (
+                  <p className="factory-meta">{approval.sourceRef}</p>
+                )}
+              </div>
+            ))}
+          </details>
+        )}
         <SpecHistory detail={detail} />
       </div>
       <footer className="factory-footer">
         <div className="factory-actions">
+          {task.stopRequested && !task.archived && !task.executionRunning && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy !== null || unavailable}
+              onClick={() =>
+                void run("resume", () =>
+                  rpc.call("factoryResumeTask", {
+                    taskId: task.id,
+                    expectedVersion: task.specVersion,
+                  }),
+                )
+              }
+            >
+              Resume task
+            </Button>
+          )}
           {active && !task.stopRequested && task.checks.length > 0 && (
             <Button
               type="button"
@@ -610,28 +562,25 @@ export function TaskDetail({
           >
             Request edits
           </Button>
-          {!task.archived && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={(busy !== null && busy !== "verify") || unavailable}
-              onClick={() =>
-                void run("stop", () =>
-                  rpc.call("factoryCancelTask", {
-                    taskId: task.id,
-                    archive: false,
-                  }),
-                )
-              }
-            >
-              {busy === "stop"
-                ? "Stopping…"
-                : task.stopRequested
-                  ? "Retry stop"
-                  : "Stop"}
-            </Button>
-          )}
+          {!task.archived &&
+            (task.executionRunning || busy === "verify" || busy === "stop") && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={(busy !== null && busy !== "verify") || unavailable}
+                onClick={() =>
+                  void run("stop", () =>
+                    rpc.call("factoryCancelTask", {
+                      taskId: task.id,
+                      archive: false,
+                    }),
+                  )
+                }
+              >
+                {busy === "stop" ? "Stopping…" : "Cancel"}
+              </Button>
+            )}
         </div>
         {editDrafted && (
           <p role="status" className="factory-meta">

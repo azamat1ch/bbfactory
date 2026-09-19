@@ -4,10 +4,15 @@ export type Requirement = FactoryTaskDetail["task"]["requirements"][number];
 export type RequirementStatus = "accepted" | "failed" | "stale" | "unverified";
 export type ReviewMethod = "check" | "agent" | "human";
 
+export function reviewMethods(requirement: Requirement): ReviewMethod[] {
+  const methods = requirement.verificationMethods.length
+    ? requirement.verificationMethods
+    : [requirement.criterion];
+  return methods.map((method) => (method === "automated" ? "check" : method));
+}
+
 export function reviewMethod(requirement: Requirement): ReviewMethod {
-  if (requirement.criterion === "human") return "human";
-  if (requirement.criterion === "agent") return "agent";
-  return "check";
+  return reviewMethods(requirement)[0]!;
 }
 
 export function reviewMethodLabel(method: ReviewMethod): string {
@@ -59,35 +64,36 @@ function evidenceCurrent(
   );
 }
 
-export function requirementStatus(
+function methodStatus(
   requirement: Requirement,
   detail: FactoryTaskDetail,
+  method: ReviewMethod,
 ): RequirementStatus {
-  const live =
-    detail.task.phase === "active" &&
-    !detail.task.stopRequested &&
-    !detail.task.archived;
   let status: RequirementStatus;
   if (findingBlocks(detail, requirement.id)) {
     status = "failed";
-  } else if (requirement.criterion === "human") {
+  } else if (method === "human") {
     const all = detail.judgments.filter(
       (item) => item.requirementId === requirement.id,
     );
     const latest = all
-      .filter((item) =>
-        recordCurrent(detail, item.specVersion, item.fingerprint),
+      .filter(
+        (item) =>
+          !detail.invalidatedEvidenceIds.includes(item.id) &&
+          recordCurrent(detail, item.specVersion, item.fingerprint),
       )
       .at(-1);
     if (latest) status = latest.accepted ? "accepted" : "failed";
     else status = all.length ? "stale" : "unverified";
-  } else if (requirement.criterion === "agent") {
+  } else if (method === "agent") {
     const all = detail.reviews.filter((item) =>
       item.requirementIds.includes(requirement.id),
     );
     const latest = all
-      .filter((item) =>
-        recordCurrent(detail, item.specVersion, item.fingerprint),
+      .filter(
+        (item) =>
+          !detail.invalidatedEvidenceIds.includes(item.id) &&
+          recordCurrent(detail, item.specVersion, item.fingerprint),
       )
       .at(-1);
     if (latest) status = latest.accepted ? "accepted" : "failed";
@@ -108,7 +114,11 @@ export function requirementStatus(
           (item) => item.check.id === check.id,
         );
         const latest = runs
-          .filter((item) => evidenceCurrent(detail, item))
+          .filter(
+            (item) =>
+              !detail.invalidatedEvidenceIds.includes(item.id) &&
+              evidenceCurrent(detail, item),
+          )
           .at(-1);
         if (!latest) {
           if (runs.length) stale = true;
@@ -127,8 +137,20 @@ export function requirementStatus(
             : "accepted";
     }
   }
-  if (!live && status === "accepted") return "stale";
   return status;
+}
+
+export function requirementStatus(
+  requirement: Requirement,
+  detail: FactoryTaskDetail,
+): RequirementStatus {
+  const statuses = reviewMethods(requirement).map((method) =>
+    methodStatus(requirement, detail, method),
+  );
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.includes("unverified")) return "unverified";
+  if (statuses.includes("stale")) return "stale";
+  return "accepted";
 }
 
 export interface RequirementRow {
@@ -193,6 +215,7 @@ export function specDelta(
       prev &&
       (prev.text !== r.text ||
         prev.criterion !== r.criterion ||
+        !sameStrings(prev.verificationMethods, r.verificationMethods) ||
         prev.reviewInstructions !== r.reviewInstructions ||
         !sameStrings(prev.artifactRefs, r.artifactRefs))
     );

@@ -7,6 +7,7 @@ import {
   findingBlocks,
   requirementRows,
   reviewMethodLabel,
+  reviewMethods,
   statusCounts,
   type RequirementRow as Row,
   type RequirementStatus,
@@ -191,7 +192,7 @@ function RequirementDetail({
           <dd>{scenario.then}</dd>
         </dl>
       ))}
-      {row.method === "check" && checks.length === 0 && (
+      {reviewMethods(requirement).includes("check") && checks.length === 0 && (
         <p className="factory-note">
           No check linked. This requirement remains unverified.
         </p>
@@ -218,10 +219,10 @@ function RequirementDetail({
           </div>
         );
       })}
-      {row.method === "agent" && (
+      {reviewMethods(requirement).includes("agent") && (
         <AgentReviews requirementId={requirement.id} detail={detail} />
       )}
-      {row.method === "human" && (
+      {reviewMethods(requirement).includes("human") && (
         <HumanJudgments requirementId={requirement.id} detail={detail} />
       )}
     </div>
@@ -230,8 +231,14 @@ function RequirementDetail({
 
 export function RequirementNavigator({
   detail,
+  selected,
+  onSelectionChange,
+  selectionDisabled,
 }: {
   detail: FactoryTaskDetail;
+  selected: string[];
+  onSelectionChange: (ids: string[]) => void;
+  selectionDisabled: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [method, setMethod] = useState<"all" | ReviewMethod>("all");
@@ -243,7 +250,7 @@ export function RequirementNavigator({
   const query = search.trim().toLowerCase();
   const filtered = rows.filter(
     (row) =>
-      (method === "all" || row.method === method) &&
+      (method === "all" || reviewMethods(row.requirement).includes(method)) &&
       (status === "all" || row.status === status) &&
       (!query ||
         row.requirement.id.toLowerCase().includes(query) ||
@@ -253,6 +260,8 @@ export function RequirementNavigator({
   const current = Math.min(page, pageCount - 1);
   const slice = filtered.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const showStatus = detail.task.phase === "active";
+  const selectable =
+    showStatus && !detail.task.archived && !detail.task.stopRequested;
   return (
     <div className="factory-nav">
       <div className="factory-progress" role="presentation">
@@ -275,7 +284,9 @@ export function RequirementNavigator({
       <p className="factory-meta" aria-label="Acceptance by method">
         {(["check", "agent", "human"] as const)
           .map((method) => {
-            const group = rows.filter((row) => row.method === method);
+            const group = rows.filter((row) =>
+              reviewMethods(row.requirement).includes(method),
+            );
             return `${reviewMethodLabel(method)} ${group.filter((row) => row.status === "accepted").length}/${group.length}`;
           })
           .join(" · ")}{" "}
@@ -323,35 +334,65 @@ export function RequirementNavigator({
           <option value="unverified">Unverified</option>
         </select>
       </div>
-      <div className="factory-group">
+      <div className="factory-group factory-requirements-table">
+        <div className="factory-requirements-heading" aria-hidden="true">
+          <span />
+          <span>ID</span>
+          <span>Requirement</span>
+          <span>Method</span>
+          <span>{showStatus ? "Coverage" : ""}</span>
+        </div>
         {slice.map((row) => (
-          <details
-            className="factory-requirement"
-            key={row.requirement.id}
-            open={expanded.has(row.requirement.id)}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setExpanded((previous) => {
-                if (previous.has(row.requirement.id) === open) return previous;
-                const next = new Set(previous);
-                if (open) next.add(row.requirement.id);
-                else next.delete(row.requirement.id);
-                return next;
-              });
-            }}
-          >
-            <summary>
-              <span className="factory-requirement-id">
-                {row.requirement.id}
-              </span>
-              <span className="factory-grow">{row.requirement.text}</span>
-              <span className="factory-method">
-                {reviewMethodLabel(row.method)}
-              </span>
-              {showStatus && <Status value={row.status} />}
-            </summary>
-            <RequirementDetail row={row} detail={detail} />
-          </details>
+          <div className="factory-requirement-row" key={row.requirement.id}>
+            {selectable && (
+              <input
+                type="checkbox"
+                className="factory-requirement-select"
+                aria-label={`Select ${row.requirement.id}: ${row.requirement.text}`}
+                checked={selected.includes(row.requirement.id)}
+                disabled={selectionDisabled}
+                onChange={(event) =>
+                  onSelectionChange(
+                    event.target.checked
+                      ? [...selected, row.requirement.id]
+                      : selected.filter((id) => id !== row.requirement.id),
+                  )
+                }
+              />
+            )}
+            <details
+              className="factory-requirement"
+              key={row.requirement.id}
+              open={expanded.has(row.requirement.id)}
+              onToggle={(event) => {
+                const open = event.currentTarget.open;
+                setExpanded((previous) => {
+                  if (previous.has(row.requirement.id) === open)
+                    return previous;
+                  const next = new Set(previous);
+                  if (open) next.add(row.requirement.id);
+                  else next.delete(row.requirement.id);
+                  return next;
+                });
+              }}
+            >
+              <summary>
+                <span className="factory-requirement-id">
+                  {row.requirement.id}
+                </span>
+                <span className="factory-requirement-text">
+                  {row.requirement.text}
+                </span>
+                <span className="factory-method">
+                  {reviewMethods(row.requirement)
+                    .map(reviewMethodLabel)
+                    .join(" + ")}
+                </span>
+                {showStatus && <Status value={row.status} />}
+              </summary>
+              <RequirementDetail row={row} detail={detail} />
+            </details>
+          </div>
         ))}
         {!slice.length && (
           <p className="factory-note factory-pad">
