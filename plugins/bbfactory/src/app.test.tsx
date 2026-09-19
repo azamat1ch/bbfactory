@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { FactoryTaskDetail } from "./shared.js";
@@ -180,6 +186,108 @@ function openSummary(slot: ReturnType<typeof renderSlot>, text: string) {
 }
 
 describe("Factory task evidence", () => {
+  it.each(["before", "after"])(
+    "stops verification and ignores its accepted response arriving %s cancellation settles",
+    async (completionOrder) => {
+      const detail = fixture();
+      let finishVerify!: (value: FactoryTaskDetail) => void;
+      let finishStop!: (value: FactoryTaskDetail) => void;
+      const verify = vi.fn(
+        () =>
+          new Promise<FactoryTaskDetail>((resolve) => {
+            finishVerify = resolve;
+          }),
+      );
+      const stop = vi.fn(
+        () =>
+          new Promise<FactoryTaskDetail>((resolve) => {
+            finishStop = resolve;
+          }),
+      );
+      const slot = mount(detail, {
+        factoryVerifyTask: verify,
+        factoryCancelTask: stop,
+      });
+      await slot.findByRole("heading", { name: detail.task.goal });
+      fireEvent.click(
+        slot.getByRole("button", { name: "Verify current content" }),
+      );
+      await waitFor(() => expect(verify).toHaveBeenCalledTimes(1));
+      const stopButton = slot.getByRole("button", { name: "Stop" });
+      expect(stopButton.hasAttribute("disabled")).toBe(false);
+      fireEvent.click(stopButton);
+      fireEvent.click(stopButton);
+      await waitFor(() =>
+        expect(stop).toHaveBeenCalledExactlyOnceWith({
+          taskId: "task-1",
+          archive: false,
+        }),
+      );
+      expect(
+        slot
+          .getByRole("button", { name: "Stopping…" })
+          .hasAttribute("disabled"),
+      ).toBe(true);
+      expect(
+        slot
+          .getByRole("button", { name: "Verify current content" })
+          .hasAttribute("disabled"),
+      ).toBe(true);
+      if (completionOrder === "before") {
+        await act(async () =>
+          finishVerify({
+            ...detail,
+            task: {
+              ...detail.task,
+              status: "accepted",
+              statusDetail: "All checks passed.",
+            },
+          }),
+        );
+        expect(
+          slot
+            .getByRole("button", { name: "Stopping…" })
+            .hasAttribute("disabled"),
+        ).toBe(true);
+        expect(
+          slot
+            .getByRole("button", { name: "Verify current content" })
+            .hasAttribute("disabled"),
+        ).toBe(true);
+        expect(slot.queryByText("Accepted")).toBeNull();
+      }
+      await act(async () =>
+        finishStop({
+          ...detail,
+          task: {
+            ...detail.task,
+            status: "unverified",
+            stopRequested: true,
+            statusDetail: "Verification stopped.",
+          },
+        }),
+      );
+      await slot.findByText("Verification stopped.");
+      expect(slot.queryByText("Accepted")).toBeNull();
+      if (completionOrder === "after") {
+        await act(async () =>
+          finishVerify({
+            ...detail,
+            task: {
+              ...detail.task,
+              status: "accepted",
+              statusDetail: "All checks passed.",
+            },
+          }),
+        );
+      }
+      expect(slot.queryByText("Accepted")).toBeNull();
+      expect(slot.queryByText("All checks passed.")).toBeNull();
+      expect(slot.getByText("Verification stopped.")).toBeTruthy();
+      expect(slot.getByRole("button", { name: "Retry stop" })).toBeTruthy();
+    },
+  );
+
   it("keeps historical passes separate from current stale acceptance and exposes real check evidence", async () => {
     const slot = mount();
     await slot.findByRole("heading", {

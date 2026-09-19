@@ -110,20 +110,34 @@ export function TaskDetail({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editDrafted, setEditDrafted] = useState(false);
-  const actionRunning = useRef(false);
+  const actionRunning = useRef<string | null>(null);
+  const stopRunning = useRef(false);
+  const actionSequence = useRef(0);
   const { task } = detail;
   const run: RunAction = async (label, action) => {
-    if (actionRunning.current) return;
-    actionRunning.current = true;
+    if (label === "stop") {
+      if (
+        stopRunning.current ||
+        (actionRunning.current !== null && actionRunning.current !== "verify")
+      )
+        return;
+      stopRunning.current = true;
+    } else if (actionRunning.current !== null || stopRunning.current) return;
+    const sequence = ++actionSequence.current;
+    actionRunning.current = label;
     setBusy(label);
     setError(null);
     try {
-      replace(await action());
+      const next = await action();
+      if (sequence === actionSequence.current) replace(next);
     } catch (cause) {
-      setError(message(cause));
+      if (sequence === actionSequence.current) setError(message(cause));
     } finally {
-      actionRunning.current = false;
-      setBusy(null);
+      if (label === "stop") stopRunning.current = false;
+      if (sequence === actionSequence.current) {
+        actionRunning.current = null;
+        setBusy(null);
+      }
     }
   };
   const blocked = detail.findings.filter(
@@ -139,8 +153,10 @@ export function TaskDetail({
           </span>
           {unavailable || error ? (
             <span className="factory-meta">Status unavailable</span>
-          ) : busy === "verify" ? (
-            <span className="factory-meta">Checking current content…</span>
+          ) : busy === "verify" || busy === "stop" ? (
+            <span className="factory-meta">
+              {busy === "stop" ? "Stopping…" : "Checking current content…"}
+            </span>
           ) : (
             <Status value={task.status} />
           )}
@@ -377,7 +393,7 @@ export function TaskDetail({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={busy !== null || unavailable}
+              disabled={(busy !== null && busy !== "verify") || unavailable}
               onClick={() =>
                 void run("stop", () =>
                   rpc.call("factoryCancelTask", {
