@@ -724,3 +724,16 @@
 :where(.factory-current-coverage) {
   margin-bottom: 0.625rem;
 }
+
+:where(.factory-requirement > summary::before) {
+  content: none;
+}
+:where(.factory-requirement-toggle) {
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.3rem;
+  color: var(--muted-foreground);
+}
+:where(.factory-requirement[open] > summary > .factory-requirement-toggle) {
+  transform: rotate(90deg);
+}

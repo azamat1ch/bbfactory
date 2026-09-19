@@ -39,6 +39,7 @@ export const executionAssignmentSchema = z
       .strict(),
     permissionMode: z.enum(["accept-edits", "auto", "full"]),
     scope: z.string().min(1).max(10_000),
+    continuationThreadId: id.nullable().optional(),
     ownership: z
       .enum(["read-only", "exclusive"])
       .default("exclusive")

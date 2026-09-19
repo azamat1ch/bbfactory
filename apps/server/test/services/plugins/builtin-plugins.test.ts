@@ -37,11 +37,21 @@ import {
 } from "../../../src/services/plugins/builtin-registry.js";
 import { copyPluginRuntime } from "@bb/plugin-build";
 import { testLogger } from "../../helpers/test-app.js";
-import {
-  createRun,
-  migrations as executionMigrations,
-} from "../../../../../plugins/workflows/src/data.js";
 import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
+
+const executionDataPath = fileURLToPath(
+  new URL("../../../../../plugins/workflows/src/data.ts", import.meta.url),
+);
+const {
+  createRun,
+  migrations: executionMigrations,
+}: {
+  migrations: string[];
+  createRun(
+    db: DbConnection["$client"],
+    input: Record<string, string | null>,
+  ): { id: string };
+} = await import(executionDataPath);
 
 const logger = testLogger as unknown as Logger;
 const testDir = dirname(fileURLToPath(import.meta.url));

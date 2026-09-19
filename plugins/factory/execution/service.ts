@@ -734,6 +734,27 @@ export function createWorkflowService(
             "Assignment workspace has active or unresolved execution ownership",
           );
       }
+      if (input.executionRunId !== undefined) {
+        const continuationIds = executionStartSchema
+          .parse(input.args)
+          .assignments.flatMap((assignment) =>
+            assignment.continuationThreadId
+              ? [assignment.continuationThreadId]
+              : [],
+          );
+        if (new Set(continuationIds).size !== continuationIds.length)
+          throw new Error("A worker can have only one continuation assignment");
+        for (const threadId of continuationIds) {
+          if (
+            db
+              .prepare(
+                `SELECT 1 FROM workflow_runs runs, json_each(runs.args_json, '$.assignments') assignments WHERE runs.status IN ('queued', 'running') AND json_extract(assignments.value, '$.continuationThreadId') = ?`,
+              )
+              .get(threadId)
+          )
+            throw new Error("Worker already has a reserved continuation");
+        }
+      }
       assertExecutionOwnerSettled(bb.server.experimental_dataDir, "workflows");
       const created = createRun(
         db,
@@ -776,6 +797,16 @@ export function createWorkflowService(
   function inspectCall(call: WorkflowCallRow): WorkflowCallInspection {
     return {
       ...call,
+      childThreadId:
+        call.childThreadId ??
+        (
+          db
+            .prepare(
+              "SELECT thread_id AS id FROM workflow_spawn_attempts WHERE call_id = ?",
+            )
+            .get(call.id) as { id: string | null } | undefined
+        )?.id ??
+        null,
       options: parseStoredAgentOptions(
         parseJson(call.optionsJson, "workflow call options"),
       ),
@@ -1068,38 +1099,83 @@ export function createWorkflowService(
           throw new Error(
             "Worker creation or stop is unresolved; replacement blocked",
           );
-        db.prepare(
-          "INSERT INTO workflow_spawn_attempts (call_id, run_id, state) VALUES (?, ?, 'requested') ON CONFLICT(call_id) DO UPDATE SET thread_id = NULL, state = 'requested'",
-        ).run(call.id, run.id);
-        spawningCalls.add(call.id);
         const assignment = assignmentFor(run, options.title);
-        const child = await bb.sdk.threads.spawn({
-          lifecycleOwnerThreadId: run.originThreadId,
-          pluginMetadata: {
-            workflowWorker: 1,
-            runId: run.id,
-            callId: call.id,
-            originThreadId: run.originThreadId,
-          },
-          projectId: run.projectId,
-          environment: assignment?.environment ?? {
-            type: "reuse",
-            environmentId: run.environmentId,
-          },
-          prompt: childPrompt(run, prompt, options),
-          title:
-            assignment?.title ??
-            options.title ??
-            `${run.name} · ${callIndex + 1}`,
-          providerId: selection.providerId,
-          model: selection.model,
-          reasoningLevel: selection.reasoningLevel,
-          permissionMode: selection.permissionMode,
-          ...(assignment === null
-            ? {}
-            : { serviceTier: assignment.serviceTier }),
-          visibility: "hidden",
-        });
+        const reusedThreadId = assignment?.continuationThreadId;
+        const continuation = reusedThreadId
+          ? await bb.sdk.threads.get({ threadId: reusedThreadId })
+          : null;
+        if (
+          continuation &&
+          (continuation.status !== "idle" || continuation.archivedAt != null)
+        )
+          throw new Error(
+            "Continuation worker is no longer idle and available",
+          );
+        throwIfCancelled(signal);
+        db.prepare(
+          "INSERT INTO workflow_spawn_attempts (call_id, run_id, thread_id, state) VALUES (?, ?, ?, 'requested') ON CONFLICT(call_id) DO UPDATE SET thread_id = excluded.thread_id, state = 'requested'",
+        ).run(call.id, run.id, reusedThreadId ?? null);
+        spawningCalls.add(call.id);
+        const child =
+          continuation ??
+          (await bb.sdk.threads.spawn({
+            lifecycleOwnerThreadId: run.originThreadId,
+            pluginMetadata: {
+              workflowWorker: 1,
+              runId: run.id,
+              callId: call.id,
+              originThreadId: run.originThreadId,
+            },
+            projectId: run.projectId,
+            environment: assignment?.environment ?? {
+              type: "reuse",
+              environmentId: run.environmentId,
+            },
+            prompt: childPrompt(run, prompt, options),
+            title:
+              assignment?.title ??
+              options.title ??
+              `${run.name} · ${callIndex + 1}`,
+            providerId: selection.providerId,
+            model: selection.model,
+            reasoningLevel: selection.reasoningLevel,
+            permissionMode: selection.permissionMode,
+            ...(assignment === null
+              ? {}
+              : { serviceTier: assignment.serviceTier }),
+            visibility: "hidden",
+          }));
+        if (reusedThreadId) {
+          if (child.status !== "idle" || child.archivedAt != null)
+            throw new Error(
+              "Continuation worker is no longer idle and available",
+            );
+          db.transaction(() => {
+            const previous = getCallByChildThread(db, reusedThreadId);
+            if (!previous || !["succeeded", "failed"].includes(previous.status))
+              throw new Error("Continuation worker is not settled");
+            db.prepare(
+              "UPDATE workflow_calls SET child_thread_id = NULL WHERE id = ?",
+            ).run(previous.id);
+            if (!attachCallThread(db, call.id, reusedThreadId))
+              throw new Error("Continuation assignment is no longer active");
+            ownWorker(db, reusedThreadId, run.id, call.id, run.originThreadId);
+            db.prepare(
+              "UPDATE workflow_spawn_attempts SET thread_id = ? WHERE call_id = ?",
+            ).run(reusedThreadId, call.id);
+          })();
+          await bb.sdk.threads.send({
+            threadId: reusedThreadId,
+            mode: "auto",
+            input: [
+              {
+                type: "text",
+                text: childPrompt(run, prompt, options),
+                mentions: [],
+              },
+            ],
+          });
+        }
         db.prepare(
           "UPDATE workflow_spawn_attempts SET thread_id = ?, state = 'attached' WHERE call_id = ?",
         ).run(child.id, call.id);
@@ -1108,7 +1184,9 @@ export function createWorkflowService(
           await stopChild(child.id);
           throw new Error("Workflow cancelled");
         }
-        const attached = attachCallThread(db, call.id, child.id);
+        const attached = reusedThreadId
+          ? getCallByChildThread(db, child.id)?.id === call.id
+          : attachCallThread(db, call.id, child.id);
         if (!attached || signal.aborted) {
           await stopChild(child.id);
           throw new Error("Workflow cancelled");
@@ -1149,7 +1227,11 @@ export function createWorkflowService(
         spawningCalls.delete(call.id);
         throwIfCancelled(signal);
         const delay = PROVIDER_RETRY_DELAYS_MS[call.providerRetryAttempts];
-        if (delay === undefined || !isRetryableProviderFailure(error)) {
+        if (
+          assignmentFor(run, options.title)?.continuationThreadId ||
+          delay === undefined ||
+          !isRetryableProviderFailure(error)
+        ) {
           throw error;
         }
         const attempt = db

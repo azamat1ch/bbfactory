@@ -9,7 +9,8 @@ Use the [Factory skill](../../plugins/factory/skills/factory/SKILL.md) as the
 operational entry point and [package guide](../../plugins/factory/README.md) for
 commands and upgrades. [Architecture](architecture.md) explains ownership and
 [behavior mapping](factory-skill-mapping.md) records what was preserved or
-simplified from the original guidance. Historical source attribution lives in
+simplified from the original guidance. [Delivery verification](factory-delivery.md) records exercised behavior and limits.
+Historical source attribution lives in
 [provenance](provenance.md).
 
 ## Specifications and evidence

@@ -687,12 +687,11 @@ export function attachCallThread(
   callId: string,
   threadId: string,
 ): boolean {
-  db.prepare(`INSERT OR IGNORE INTO workflow_workers(thread_id, run_id, call_id, origin_thread_id)
+  db.prepare(
+    `INSERT OR IGNORE INTO workflow_workers(thread_id, run_id, call_id, origin_thread_id)
     SELECT ?, calls.run_id, calls.id, runs.origin_thread_id FROM workflow_calls calls
-    JOIN workflow_runs runs ON runs.id = calls.run_id WHERE calls.id = ?`).run(
-    threadId,
-    callId,
-  );
+    JOIN workflow_runs runs ON runs.id = calls.run_id WHERE calls.id = ?`,
+  ).run(threadId, callId);
   return (
     db
       .prepare(
@@ -941,15 +940,19 @@ export function ownWorker(
   callId: string,
   originThreadId: string,
 ): void {
-  db.prepare(`INSERT OR IGNORE INTO workflow_workers(thread_id, run_id, call_id, origin_thread_id)
-    VALUES (?, ?, ?, ?)`).run(threadId, runId, callId, originThreadId);
+  db.prepare(
+    `INSERT INTO workflow_workers(thread_id, run_id, call_id, origin_thread_id)
+    VALUES (?, ?, ?, ?) ON CONFLICT(thread_id) DO UPDATE SET run_id = excluded.run_id, call_id = excluded.call_id, origin_thread_id = excluded.origin_thread_id, archived_at = NULL, next_cleanup_at = 0`,
+  ).run(threadId, runId, callId, originThreadId);
 }
 
 export function workerOrigins(db: Db, now: number): string[] {
   return (
     db
-      .prepare(`SELECT origin_thread_id AS id FROM workflow_runs WHERE status IN ('queued', 'running')
-    UNION SELECT origin_thread_id AS id FROM workflow_workers WHERE archived_at IS NULL AND next_cleanup_at <= ?`)
+      .prepare(
+        `SELECT origin_thread_id AS id FROM workflow_runs WHERE status IN ('queued', 'running')
+    UNION SELECT origin_thread_id AS id FROM workflow_workers WHERE archived_at IS NULL AND next_cleanup_at <= ?`,
+      )
       .all(now) as Array<{ id: string }>
   ).map((row) => row.id);
 }
@@ -959,14 +962,17 @@ export function retiredWorkers(
   now: number,
 ): Array<{ threadId: string; callId: string }> {
   return db
-    .prepare(`SELECT workers.thread_id AS threadId, workers.call_id AS callId
+    .prepare(
+      `SELECT workers.thread_id AS threadId, workers.call_id AS callId
     FROM workflow_workers workers
     LEFT JOIN workflow_calls calls ON calls.id = workers.call_id
     LEFT JOIN workflow_runs runs ON runs.id = workers.run_id
     WHERE workers.archived_at IS NULL AND workers.next_cleanup_at <= ?
+      AND NOT COALESCE(runs.id LIKE 'wfr_exec_%' AND runs.status != 'cancelled' AND calls.status IN ('succeeded', 'failed') AND calls.child_thread_id = workers.thread_id, 0)
       AND (calls.id IS NULL OR calls.status NOT IN ('queued', 'running')
         OR calls.child_thread_id IS NOT workers.thread_id OR runs.status NOT IN ('queued', 'running'))
-    ORDER BY workers.next_cleanup_at, workers.thread_id LIMIT 100`)
+    ORDER BY workers.next_cleanup_at, workers.thread_id LIMIT 100`,
+    )
     .all(now) as Array<{ threadId: string; callId: string }>;
 }
 
@@ -980,8 +986,10 @@ export function recordWorkerCleanup(
       next_cleanup_at = ? + min(60000, 1000 << min(cleanup_attempts, 6)),
       cleanup_attempts = cleanup_attempts + 1 WHERE thread_id = ?`,
   ).run(archived ? Date.now() : null, Date.now(), threadId);
-  db.prepare(`DELETE FROM workflow_workers WHERE archived_at IS NOT NULL
-    AND NOT EXISTS (SELECT 1 FROM workflow_runs WHERE id = workflow_workers.run_id)`).run();
+  db.prepare(
+    `DELETE FROM workflow_workers WHERE archived_at IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM workflow_runs WHERE id = workflow_workers.run_id)`,
+  ).run();
 }
 
 export function hasWorker(db: Db, threadId: string): boolean {
@@ -996,8 +1004,10 @@ export function abandonOriginNotifications(
   db: Db,
   originThreadId: string,
 ): void {
-  db.prepare(`UPDATE workflow_runs SET notification_sent = 1,
+  db.prepare(
+    `UPDATE workflow_runs SET notification_sent = 1,
     notification_outcome = 'abandoned', notification_next_attempt_at = NULL,
     notification_error = 'Origin thread is archived or deleted'
-    WHERE origin_thread_id = ? AND notification_sent = 0`).run(originThreadId);
+    WHERE origin_thread_id = ? AND notification_sent = 0`,
+  ).run(originThreadId);
 }

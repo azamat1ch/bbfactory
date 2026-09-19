@@ -985,6 +985,9 @@ export function createFactoryService(
                 permissionMode: a.permissionMode,
                 scope: a.scope,
                 ownership: a.ownership,
+                ...(a.continuationThreadId
+                  ? { continuationThreadId: a.continuationThreadId }
+                  : {}),
               })),
             },
           });

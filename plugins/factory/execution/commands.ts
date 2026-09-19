@@ -38,7 +38,7 @@ export function registerExecutionCommands(
         }),
         guide: cliCommand({
           description:
-            'Use the assignment ID from the task. Reuse guidanceId only to retry the same message; use a new ID for new guidance. mode is steer for an active turn or followUp for another turn. Submitted delivery does not establish compliance. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution guide --input \'{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id","assignmentId":"implementation","guidanceId":"correction-1","message":"Run the focused regression before returning.","mode":"steer"}\'',
+            'Use the assignment ID from the task. Reuse guidanceId only to retry the same message; use a new ID for new guidance. mode is steer or queued followUp for a running assignment. For a settled worker, use bb factory assign with a new launchId and assignment id plus continuationThreadId; preserve profile, permissions and environment. Submitted delivery does not establish compliance. Replace example IDs with your actual IDs.\n\nExample:\nbb factory execution guide --input \'{"originThreadId":"thr_origin","callerTaskId":"task_id","launchId":"launch_id","assignmentId":"implementation","guidanceId":"correction-1","message":"Run the focused regression before returning.","mode":"steer"}\'',
           summary: "Steer or follow up an assignment with a durable guidanceId",
           options: {
             input: {

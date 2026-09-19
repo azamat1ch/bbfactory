@@ -377,6 +377,11 @@ export function RequirementNavigator({
               }}
             >
               <summary>
+                <Icon
+                  name="ChevronRight"
+                  className="factory-requirement-toggle"
+                  aria-hidden="true"
+                />
                 <span className="factory-requirement-id">
                   {row.requirement.id}
                 </span>

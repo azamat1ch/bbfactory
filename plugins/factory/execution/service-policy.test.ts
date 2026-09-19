@@ -1833,7 +1833,7 @@ describe("workflow service policy integration", () => {
     expect(text).toContain(run.id);
     expect(text).toContain("failed");
     expect(text).toContain("[truncated]");
-    expect(text).toContain(`bb workflows status ${run.id}`);
+    expect(text).toContain(`bb factory execution status ${run.id}`);
     expect(text).not.toContain("�");
   });
 });
@@ -1914,6 +1914,102 @@ describe("native assignment execution RPC", () => {
       ],
     };
   }
+  it("continues a settled native session with new durable results and preserves its original history", async () => {
+    const test = fixture();
+    const input = request();
+    const first = executionSnapshotSchema.parse(
+      await test.harness.callRpc("experimental_executionStart", input),
+    );
+    const controller = new AbortController();
+    const worker = test.service.runWorker(controller.signal);
+    try {
+      await eventually(() => expect(test.childCount()).toBe(1));
+      test.workers.get("child-1")!.status = "idle";
+      test.service.onThreadIdle("child-1", "original result");
+      await eventually(async () =>
+        expect(
+          executionSnapshotSchema.parse(
+            await test.harness.callRpc(
+              "experimental_executionInspect",
+              inputIdentity(input),
+            ),
+          ).nativeSettlement,
+        ).toBe("confirmed"),
+      );
+      expect(test.archived).not.toContain("child-1");
+      const followup = {
+        ...input,
+        launchId: "correction",
+        assignments: [
+          {
+            ...input.assignments[0]!,
+            id: "correction",
+            prompt: "Fix the remaining issue",
+            continuationThreadId: "child-1",
+          },
+        ],
+      };
+      await expect(
+        test.harness.callRpc("experimental_executionStart", {
+          ...followup,
+          callerTaskId: "other",
+        }),
+      ).rejects.toThrow("another task");
+      test.harness.sdk.stub("threads.send", async ({ threadId }) => {
+        if (threadId === "child-1")
+          test.workers.get("child-1")!.status = "active";
+        return { ok: true };
+      });
+      const next = executionSnapshotSchema.parse(
+        await test.harness.callRpc("experimental_executionStart", followup),
+      );
+      await eventually(() => {
+        expect(test.service.inspect(next.runId)?.error).toBeNull();
+        expect(test.harness.sdk.callsTo("threads.send")).toContainEqual([
+          expect.objectContaining({ threadId: "child-1" }),
+        ]);
+      });
+      expect(test.childCount()).toBe(1);
+      expect(test.service.inspect(first.runId)?.calls[0]).toMatchObject({
+        childThreadId: "child-1",
+        resultJson: JSON.stringify("original result"),
+        status: "succeeded",
+      });
+      await expect(
+        test.harness.callRpc("experimental_executionStart", {
+          ...followup,
+          launchId: "duplicate",
+        }),
+      ).rejects.toThrow();
+      test.workers.get("child-1")!.status = "idle";
+      test.service.onThreadIdle("child-1", "corrected result");
+      await eventually(() =>
+        expect(test.service.get(next.runId)?.status).toBe("succeeded"),
+      );
+      expect(test.service.inspect(next.runId)?.calls[0]).toMatchObject({
+        childThreadId: "child-1",
+        resultJson: JSON.stringify("corrected result"),
+      });
+      expect(test.service.inspect(first.runId)?.calls[0]?.resultJson).toBe(
+        JSON.stringify("original result"),
+      );
+      const events = test.db
+        .prepare(
+          "SELECT run_id AS runId, result_json AS result FROM workflow_execution_events WHERE assignment_id IS NOT NULL ORDER BY sequence",
+        )
+        .all();
+      expect(events).toEqual([
+        { runId: first.runId, result: JSON.stringify("original result") },
+        { runId: next.runId, result: JSON.stringify("corrected result") },
+      ]);
+      await test.harness.callRpc("experimental_executionStart", followup);
+      expect(test.childCount()).toBe(1);
+    } finally {
+      controller.abort();
+      await worker;
+    }
+  });
+
   it("persists uncertain guidance before sending and suppresses replay after a lost response and restart", async () => {
     const test = fixture();
     const input = request();

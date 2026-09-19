@@ -294,7 +294,7 @@ bb factory execution guide-status --input '<JSON>'
 
 `guide` takes the execution identity (`originThreadId`, `callerTaskId`,
 `launchId`) plus `assignmentId`, a stable `guidanceId`, `message` and `mode`
-(`steer` or `followUp`). It returns a durable receipt recording
+(`steer` or queued `followUp`, both for running assignments). It returns a durable receipt recording
 `delivery=submitted` or `uncertain` — never `compliance`; an identical retry
 returns the saved receipt without sending again, and changed content under
 the same `guidanceId` is rejected. After a reconnect or an ambiguous
@@ -339,15 +339,22 @@ Practical consequences:
 
 ## Continuation, retries and handover
 
-`bb thread tell <id>` on an idle thread continues the same conversation —
-the native equivalent of a persisted-session continuation, available on every
-provider. For follow-up review or fixes, continue the same healthy thread
-instead of launching a fresh one: send only the follow-up, preserve the task
-constraints and deviation journal path. Continue the latest successfully
-completed thread only. If the prior state is failed, cancelled or uncertain,
-reconcile what happened first and make any replacement a deliberate decision
-with an explicit remaining-work prompt — never silently replay the original
-task.
+For a completed Factory worker, create a new `bb factory assign --input`
+request with a fresh `launchId` and assignment `id`, and set
+`continuationThreadId` to the prior worker's native thread ID. Keep the same
+profile, permissions and environment; provide only the bounded correction,
+constraints and completion criteria. This reuses the provider session while
+recording a new result and reacquiring workspace ownership. Earlier results
+remain historical evidence, not proof of the correction. Inspect and wait
+using the new launch identity. Do not send untracked work with `thread tell`
+to a Factory-owned worker.
+
+Continuation requires the previous execution to be settled and the thread
+idle and unarchived. Active, cancelled, uncertain or unavailable sessions
+must be reconciled first; use a fresh assignment with a focused handover
+when the old session cannot be continued. An uncertain send is never retried
+automatically. Ordinary ad-hoc native threads can still use `bb thread tell`
+to continue their conversation.
 
 `bb thread retry <id> --reason "<diagnosis>"` retries only the thread's
 failed turn — use it for a diagnosed backend failure, never as a blind retry

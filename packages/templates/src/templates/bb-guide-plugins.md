@@ -997,7 +997,7 @@ Factory owns new delegated execution internally; standalone Workflows is optiona
 and disabled on fresh installations. `bb factory execution run|validate|status|history|list|stop`
 retains the durable runtime commands. `bb factory execution inspect|guide|guide-status|wait --input <json>`
 uses the discoverable execution schemas on `factory-team`; `guide` takes an
-execution identity, assignmentId, guidanceId, message and `steer`/`followUp` mode.
+execution identity, assignmentId, guidanceId, message and `steer`/`followUp` mode for a running assignment. To continue a settled Factory session, create a new assignment with a fresh launchId/id and `continuationThreadId`; preserve its profile, permissions and environment. This reacquires ownership and retains both results.
 `wait` takes `targets` with execution identities and `afterCursor`, plus a bounded
 timeoutMs. Start task assignments with `bb factory assign --input <json>`.
 Existing Workflows runs retain their owner and must settle before disabling its

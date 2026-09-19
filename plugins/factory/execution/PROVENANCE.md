@@ -60,3 +60,10 @@ read-only. Cross-run sharing conservatively requires every assignment in the
 existing run to be read-only; mixed runs retain exclusive reservation until
 settled. Cross-plugin owner drain remains exclusive. Stored legacy requests are
 normalized for identity checks without rewriting their execution records.
+
+Factory-only continuation keeps settled managed sessions until retention cleanup.
+A fresh assignment may name `continuationThreadId`; it reserves the existing
+session and workspace through the normal durable execution path. The current
+call owns the mutable thread link, while prior calls retain their thread identity
+in `workflow_spawn_attempts` and inspection history. Results and completion events
+remain separate per run. Standalone Workflows does not expose this assignment API.

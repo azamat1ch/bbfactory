@@ -46,8 +46,10 @@ export function createExecutionSupervision(
     guidanceId: string,
   ): GuidanceRow | undefined {
     return db
-      .prepare(`SELECT guidance_id AS guidanceId, assignment_id AS assignmentId, thread_id AS threadId,
-      message, mode, delivery FROM workflow_execution_guidance WHERE run_id = ? AND guidance_id = ?`)
+      .prepare(
+        `SELECT guidance_id AS guidanceId, assignment_id AS assignmentId, thread_id AS threadId,
+      message, mode, delivery FROM workflow_execution_guidance WHERE run_id = ? AND guidance_id = ?`,
+      )
       .get(runId, guidanceId) as GuidanceRow | undefined;
   }
   function receipt(row: GuidanceRow) {
@@ -75,9 +77,13 @@ export function createExecutionSupervision(
         (entry) => entry.id === input.assignmentId,
       );
       if (!assignment?.threadId || assignment.status !== "running")
-        throw new Error("Assignment has no running native worker");
-      db.prepare(`INSERT INTO workflow_execution_guidance (run_id, guidance_id, assignment_id, thread_id, message, mode, delivery)
-        VALUES (?, ?, ?, ?, ?, ?, 'uncertain')`).run(
+        throw new Error(
+          "Assignment has no running native worker; use a new Factory assignment with continuationThreadId to continue a settled session",
+        );
+      db.prepare(
+        `INSERT INTO workflow_execution_guidance (run_id, guidance_id, assignment_id, thread_id, message, mode, delivery)
+        VALUES (?, ?, ?, ?, ?, ?, 'uncertain')`,
+      ).run(
         snapshot.runId,
         input.guidanceId,
         input.assignmentId,
@@ -118,8 +124,10 @@ export function createExecutionSupervision(
         let first: EventRow | undefined;
         for (const target of targets) {
           const event = db
-            .prepare(`SELECT sequence, run_id AS runId, assignment_id AS assignmentId, thread_id AS threadId,
-            status, result_json AS output, error FROM workflow_execution_events WHERE run_id = ? AND sequence > ? ORDER BY sequence LIMIT 1`)
+            .prepare(
+              `SELECT sequence, run_id AS runId, assignment_id AS assignmentId, thread_id AS threadId,
+            status, result_json AS output, error FROM workflow_execution_events WHERE run_id = ? AND sequence > ? ORDER BY sequence LIMIT 1`,
+            )
             .get(target.runId, target.afterCursor) as EventRow | undefined;
           if (
             event !== undefined &&

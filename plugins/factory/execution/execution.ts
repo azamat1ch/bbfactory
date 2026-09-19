@@ -141,6 +141,68 @@ export function registerExecutionRpc(
         throw new Error("Launch identity already has a different request");
       return inspect(input);
     }
+    for (const assignment of input.assignments) {
+      if (!assignment.continuationThreadId) continue;
+      const previous = db
+        .prepare(
+          `SELECT calls.run_id AS runId, calls.status FROM workflow_calls calls WHERE calls.child_thread_id = ?`,
+        )
+        .get(assignment.continuationThreadId) as
+        | { runId: string; status: string }
+        | undefined;
+      if (!previous || !["succeeded", "failed"].includes(previous.status))
+        throw new Error("Continuation requires a settled Factory worker");
+      const previousRun = service.inspect(previous.runId);
+      if (
+        !previousRun ||
+        !previous.runId.startsWith("wfr_exec_") ||
+        !["succeeded", "failed"].includes(previousRun.status)
+      )
+        throw new Error(
+          "Previous execution must be settled before continuation",
+        );
+      const request = executionStartSchema.parse(
+        JSON.parse(previousRun.argsJson),
+      );
+      if (
+        request.originThreadId !== input.originThreadId ||
+        request.callerTaskId !== input.callerTaskId
+      )
+        throw new Error("Continuation belongs to another task or origin");
+      const priorCall = previousRun.calls.find(
+        (call) => call.childThreadId === assignment.continuationThreadId,
+      );
+      const prior = request.assignments.find(
+        (entry) => entry.id === priorCall?.options.title,
+      );
+      if (
+        !prior ||
+        [
+          "providerId",
+          "model",
+          "reasoningLevel",
+          "serviceTier",
+          "permissionMode",
+        ].some(
+          (key) =>
+            prior[key as keyof typeof prior] !==
+            assignment[key as keyof typeof assignment],
+        ) ||
+        prior.environment.environmentId !== assignment.environment.environmentId
+      )
+        throw new Error(
+          "Continuation must preserve worker profile, permissions and environment",
+        );
+      if (
+        inspectExecution(db, service, request).nativeSettlement !== "confirmed"
+      )
+        throw new Error("Previous execution has unresolved native ownership");
+      const thread = await bb.sdk.threads.get({
+        threadId: assignment.continuationThreadId,
+      });
+      if (thread.status !== "idle" || thread.archivedAt != null)
+        throw new Error("Continuation worker must be idle and unarchived");
+    }
     const origin = await bb.sdk.threads.get({ threadId: input.originThreadId });
     if (origin.projectId !== input.projectId)
       throw new Error("Execution origin belongs to another project");

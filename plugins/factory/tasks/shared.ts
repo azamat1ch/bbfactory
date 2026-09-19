@@ -102,6 +102,7 @@ export const assignmentInputSchema = z.strictObject({
   permissionMode: z.enum(["accept-edits", "auto", "full"]),
   scope: z.string().min(1),
   ownership: z.enum(["read-only", "exclusive"]),
+  continuationThreadId: id.nullable().optional(),
 });
 export const assignmentSchema = assignmentInputSchema.extend({
   launchId: id,
