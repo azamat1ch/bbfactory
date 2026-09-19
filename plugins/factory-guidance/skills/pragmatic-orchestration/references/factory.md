@@ -87,7 +87,7 @@ logs and Workflows history, preserve partial results, and collect every requeste
 worker's success or failure. A timeout ends observation, not the task.
 
 The supported SDK cross-plugin seam is Workflows RPC, plugin id
-`builtin:workflows`: `experimental_executionStart`,
+`workflows`: `experimental_executionStart`,
 `experimental_executionInspect`, `experimental_executionCancel`, and
 `experimental_executionGuide`, called through `bb.sdk.plugins.callRpc`.
 Identity is originThreadId + callerTaskId + launchId. Do not import Workflows'
