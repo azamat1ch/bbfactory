@@ -545,8 +545,27 @@ describe("Factory task evidence", () => {
     await slot.findByText(
       "Delivery approved. Verification coverage is shown separately.",
     );
+    expect(slot.getByText("5/5 approved")).toBeTruthy();
     expect(
-      slot.getByText("Approved", { selector: ".factory-status" }),
+      slot.container.querySelectorAll(
+        ".factory-requirement > summary > .factory-status",
+      ),
+    ).toHaveLength(5);
+    for (const badge of slot.container.querySelectorAll(
+      ".factory-requirement > summary > .factory-status",
+    )) {
+      expect(badge.textContent).toBe("Approved");
+    }
+    expect(slot.queryByText("Current coverage")).toBeNull();
+    expect(
+      slot.container
+        .querySelector(".factory-current-coverage")
+        ?.hasAttribute("open"),
+    ).toBe(false);
+    expect(
+      slot.getByText("Approved", {
+        selector: ".factory-detail-header .factory-status",
+      }),
     ).toBeTruthy();
     expect(
       slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),
@@ -881,7 +900,7 @@ describe("Factory task evidence", () => {
     expect(
       slot.container.querySelector(".factory-requirements-heading")!
         .textContent,
-    ).toContain("Coverage");
+    ).toContain("Approval");
     expect(
       slot.container
         .querySelector(".factory-requirement")!
@@ -988,7 +1007,7 @@ describe("Factory task evidence", () => {
         slot.container.querySelector(".factory-detail-header")!,
       ).queryByText("Stale"),
     ).toBeNull();
-    expect(slot.getByText("Current coverage")).toBeTruthy();
+    expect(slot.getByText("Verification details")).toBeTruthy();
     openSummary(slot, "Historical snapshots (1)");
     expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
     expect(
@@ -1010,7 +1029,7 @@ describe("Factory task evidence", () => {
         slot.container.querySelector(".factory-detail-header")!,
       ).queryByText("Stale"),
     ).toBeNull();
-    expect(slot.getByText("Current coverage")).toBeTruthy();
+    expect(slot.getByText("Verification details")).toBeTruthy();
     expect(slot.getByText("Coverage at delivery: accepted")).toBeTruthy();
     expect(
       slot.getByText("0 accepted · 1 failed · 0 stale · 4 unverified"),

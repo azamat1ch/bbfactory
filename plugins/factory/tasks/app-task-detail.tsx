@@ -393,15 +393,16 @@ export function TaskDetail({
           <span className="factory-meta">{task.requirements.length}</span>
         </div>
         {active && (
-          <div className="factory-current-coverage">
+          <details className="factory-current-coverage">
+            <summary>Verification details</summary>
             <div className="factory-check-heading">
-              <span className="factory-meta">Current coverage</span>
+              <span className="factory-meta">Evidence status</span>
               {!unavailable && !error && <Status value={task.status} />}
             </div>
             {statusLine && (
               <p className="factory-status-detail">{statusLine}</p>
             )}
-          </div>
+          </details>
         )}
         <RequirementNavigator
           detail={detail}

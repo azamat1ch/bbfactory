@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
-import type { FactoryEvidence, FactoryTaskDetail } from "./shared.js";
+import {
+  approvedRequirementIds,
+  type FactoryEvidence,
+  type FactoryTaskDetail,
+} from "./shared.js";
 import { ArtifactList, Status, time } from "./app-primitives.js";
 import {
   findingBlocks,
@@ -168,6 +172,9 @@ function RequirementDetail({
   const blocked = findingBlocks(detail, requirement.id);
   return (
     <div className="factory-inset">
+      <p className="factory-meta">
+        Verification evidence: <Status value={row.status} />
+      </p>
       {blocked && (
         <p className="factory-note">
           A required finding is unresolved and blocks acceptance.
@@ -247,6 +254,7 @@ export function RequirementNavigator({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => requirementRows(detail), [detail]);
   const counts = statusCounts(rows);
+  const approved = approvedRequirementIds(detail);
   const query = search.trim().toLowerCase();
   const filtered = rows.filter(
     (row) =>
@@ -264,34 +272,40 @@ export function RequirementNavigator({
     showStatus && !detail.task.archived && !detail.task.stopRequested;
   return (
     <div className="factory-nav">
-      <div className="factory-progress" role="presentation">
-        {(
-          ["accepted", "failed", "stale", "unverified"] as RequirementStatus[]
-        ).map((key) =>
-          counts[key] ? (
-            <span
-              key={key}
-              className={`factory-progress-seg factory-progress-${key}`}
-              style={{ flexGrow: counts[key] }}
-            />
-          ) : null,
-        )}
-      </div>
-      <p className="factory-meta factory-counts">
-        {counts.accepted} accepted · {counts.failed} failed · {counts.stale}{" "}
-        stale · {counts.unverified} unverified
+      <p className="factory-counts" aria-label="Your approval">
+        {approved.size}/{rows.length} approved
       </p>
-      <p className="factory-meta" aria-label="Acceptance by method">
-        {(["check", "agent", "human"] as const)
-          .map((method) => {
-            const group = rows.filter((row) =>
-              reviewMethods(row.requirement).includes(method),
-            );
-            return `${reviewMethodLabel(method)} ${group.filter((row) => row.status === "accepted").length}/${group.length}`;
-          })
-          .join(" · ")}{" "}
-        accepted
-      </p>
+      <details className="factory-section">
+        <summary>Verification evidence</summary>
+        <div className="factory-progress" role="presentation">
+          {(
+            ["accepted", "failed", "stale", "unverified"] as RequirementStatus[]
+          ).map((key) =>
+            counts[key] ? (
+              <span
+                key={key}
+                className={`factory-progress-seg factory-progress-${key}`}
+                style={{ flexGrow: counts[key] }}
+              />
+            ) : null,
+          )}
+        </div>
+        <p className="factory-meta factory-counts">
+          {counts.accepted} accepted · {counts.failed} failed · {counts.stale}{" "}
+          stale · {counts.unverified} unverified
+        </p>
+        <p className="factory-meta" aria-label="Acceptance by method">
+          {(["check", "agent", "human"] as const)
+            .map((method) => {
+              const group = rows.filter((row) =>
+                reviewMethods(row.requirement).includes(method),
+              );
+              return `${reviewMethodLabel(method)} ${group.filter((row) => row.status === "accepted").length}/${group.length}`;
+            })
+            .join(" · ")}{" "}
+          accepted
+        </p>
+      </details>
       {selectable && (
         <div className="factory-actions">
           <Button
@@ -366,7 +380,7 @@ export function RequirementNavigator({
           <span>ID</span>
           <span>Requirement</span>
           <span>Method</span>
-          <span>{showStatus ? "Coverage" : ""}</span>
+          <span>{showStatus ? "Approval" : ""}</span>
         </div>
         {slice.map((row) => (
           <div className="factory-requirement-row" key={row.requirement.id}>
@@ -419,7 +433,15 @@ export function RequirementNavigator({
                     .map(reviewMethodLabel)
                     .join(" + ")}
                 </span>
-                {showStatus && <Status value={row.status} />}
+                {showStatus && (
+                  <span
+                    className={`factory-status ${approved.has(row.requirement.id) ? "factory-status-accepted" : ""}`}
+                  >
+                    {approved.has(row.requirement.id)
+                      ? "Approved"
+                      : "Awaiting approval"}
+                  </span>
+                )}
               </summary>
               <RequirementDetail row={row} detail={detail} />
             </details>

@@ -440,17 +440,23 @@ export type FactoryEvidence = z.infer<typeof evidenceSchema>;
 export type FactoryAssignment = z.infer<typeof assignmentSchema>;
 export type FactoryContent = z.infer<typeof contentSchema>;
 
-export function specApproved(detail: FactoryTaskDetail): boolean {
+export function approvedRequirementIds(detail: FactoryTaskDetail): Set<string> {
   const decisions = new Map<string, boolean>();
   for (const approval of detail.approvals) {
     if (approval.specVersion !== detail.task.specVersion) continue;
     for (const id of approval.requirementIds)
       decisions.set(id, approval.accepted);
   }
+  return new Set(
+    detail.task.requirements
+      .filter((requirement) => decisions.get(requirement.id) === true)
+      .map((requirement) => requirement.id),
+  );
+}
+
+export function specApproved(detail: FactoryTaskDetail): boolean {
   return (
     detail.task.requirements.length > 0 &&
-    detail.task.requirements.every(
-      (requirement) => decisions.get(requirement.id) === true,
-    )
+    approvedRequirementIds(detail).size === detail.task.requirements.length
   );
 }
