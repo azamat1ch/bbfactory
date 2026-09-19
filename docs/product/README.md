@@ -36,6 +36,8 @@ otherwise.
 
 These documents are the canonical product specifications. They describe planned behavior; they are not evidence of implemented features or runnable tests.
 
+- [Core chat and demo](chat-and-demo.md) — proposed native conversation experience and two-minute demo.
+
 1. [Product decisions](decisions.md) — agreed choices and open experiments.
 2. [First implementation slice](first-slice.md) — next deliverable, interfaces, ownership, and proposed behavioral checks.
 3. [Architecture](architecture.md) — verified upstream integration surfaces and proposed runtime design.

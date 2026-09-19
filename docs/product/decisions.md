@@ -4,6 +4,7 @@
 - Initial configured lead: Astra. Lead model remains user-selectable.
 - Sol and Devin are peer implementers/reviewers. Use available eligible workers; direct in-thread execution remains supported.
 - Explore Jev for worker selection and compare against simple rules. No assumption yet that it improves routing; no provider credentials or spending authorized by this note.
+- Reflect orchestration in the core chat: conversational lead, separate worker team and execution choice, task context, review and verification. Layout remains a proposal in [core chat and demo](chat-and-demo.md).
 - Prototype both compact task cards and a team dashboard against the same run state. User wants to see both before choosing the default.
 - Product name confirmed by user: bbfactory. GitHub repository: https://github.com/azamat1ch/bbfactory (private).
 - Premium escalation policy remains a configurable proposal; no numeric spending/quota budget has been agreed.
