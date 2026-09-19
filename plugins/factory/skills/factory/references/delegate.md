@@ -259,29 +259,21 @@ discipline without claiming one.
    this worker could make on this task and explain them and their required
    handling in the prompt. Tell it not to expand scope or improvise around
    blockers; it must record and report them for lead guidance.
-3. **Require a deviation journal.** Resolve the launch date in the user's
-   timezone and a filesystem-safe task slug yourself, then pass the literal
-   path `docs/tmp/{yyyy.MM.dd}_{task-name}_deviations.md` with both
-   placeholders filled in. Instruct the worker to record every surprise and
-   plan deviation as it occurs — expected versus observed behavior, evidence,
-   action taken or proposed, unresolved risks — and to write an explicit
-   "No deviations" entry if none occurred. Keep the same path through
-   steering and reattachment; never overwrite another task's journal.
-   Projects keep their own documentation layout — when the project has a
-   different convention for such records, use it and record the chosen path
-   in the handover. For a strictly read-only investigation, require the same
-   content in a `Deviations` section of the final answer instead of a
-   repository write.
+3. **Record meaningful deviations.** Keep a concise task note or artifact in
+   thread storage with expected versus observed behavior, evidence, decisions
+   and unresolved risks. Carry its reference into handovers and follow-ups.
+   Do not add temporary journals to the target repository. For read-only work,
+   include deviations in the final result.
 4. **Review the code yourself after completion.** Inspect the actual diff and
    surrounding code against the task and anticipated pitfalls, and run or
    independently verify the relevant checks. Worker confidence, passing
    tests and a successful exit do not replace this review.
-5. **Read the entire deviation journal.** Reconcile it with the
+5. **Review reported deviations.** Reconcile it with the
    implementation and check results; investigate discrepancies and unreported
-   deviations. A missing journal is an incomplete deliverable.
+   deviations.
 
 These requirements apply to foreground, supervised and long-running
-delegation. Carry the task contract and journal path into any lead handoff.
+delegation. Carry the task contract and evidence references into any lead handoff.
 
 ## Steering modes and delivery semantics
 

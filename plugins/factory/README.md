@@ -45,8 +45,11 @@ store, even in disjoint workspaces. Do not reset either database.
 
 Host resource coordination is cooperative guidance: the lead arranges one heavy
 check at a time when costs are unknown. It does not constrain arbitrary shell
-commands. See [architecture](../../docs/product/architecture.md) and
-[execution provenance](execution/PROVENANCE.md) for deeper details.
+commands. Concurrent servers writing one data directory are unsupported.
+Observed code changes invalidate evidence; changes entirely between observations
+cannot be detected. Context diagnostics show BB-prepared instructions, not additions
+inside the provider harness. See [execution provenance](execution/PROVENANCE.md)
+for source maintenance and execution details.
 
 A local installation pinned to the removed `plugins/factory-team` directory is
 recognized when the adjacent `plugins/factory` package has the preserved package
