@@ -417,7 +417,7 @@ export function TaskDetail({
         <RequirementNavigator
           detail={detail}
           selected={selected}
-          selectionDisabled={busy !== null || unavailable || !fingerprint}
+          selectionDisabled={busy !== null || unavailable}
           onSelectionChange={(ids) => setSelection({ identity, ids })}
         />
         <HumanReviewPanel

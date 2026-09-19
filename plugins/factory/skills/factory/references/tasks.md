@@ -50,7 +50,9 @@ saves a draft. Once scope is agreed, `start` takes `taskId` and
 independently of worker claims; `status` takes the same input and `list`
 takes `{ "threadId": "<id>" }`. An `update` includes `expectedVersion`, the
 complete spec and `changeReason`; changed requirements or checks require
-fresh evidence.
+fresh evidence. Optional `environmentId` repairs the target workspace as a new
+revision after execution settles; prior evidence is invalidated. Use a registered
+repository environment, not a personal chat directory without Git.
 
 Each requirement carries a `criterion` (`automated`, `agent` or `human`) or a
 `verificationMethods` list. An empty list means the legacy `criterion`

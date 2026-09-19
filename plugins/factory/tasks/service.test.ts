@@ -323,6 +323,41 @@ const assignment = (id: string, environmentId = "env") => ({
 });
 
 describe("Factory acceptance against real SQLite migrations", () => {
+  it("repairs a workspace binding as a new revision without transferring evidence", async () => {
+    const f = fixture();
+    const { task } = await f.create();
+    const prior = await f.service.verifyTask(task.id);
+    const next = await f.service.updateTask({
+      taskId: task.id,
+      expectedVersion: 1,
+      spec,
+      changeReason: "Connect the implementation repository",
+      environmentId: "repository",
+    });
+    expect(next.task.environmentId).toBe("repository");
+    expect(next.task.specVersion).toBe(2);
+    expect(next.observedContent?.canonicalPath).toBe("/workspace/repository");
+    expect(next.invalidatedEvidenceIds).toEqual(
+      expect.arrayContaining(prior.evidence.map((e) => e.id)),
+    );
+    expect((await f.service.getTaskDetail(task.id)).task.status).not.toBe(
+      "accepted",
+    );
+    expect(next.approvals).toEqual([]);
+    f.setComplete(false);
+    await expect(
+      f.service.updateTask({
+        taskId: task.id,
+        expectedVersion: 2,
+        spec,
+        changeReason: "Bad target",
+        environmentId: "missing",
+      }),
+    ).rejects.toThrow("cannot be captured");
+    expect((await f.service.getTaskDetail(task.id)).task.environmentId).toBe(
+      "repository",
+    );
+  });
   it("requires every selected verification method and keeps approval separate from checks", async () => {
     const f = fixture();
     const { task } = await f.create(

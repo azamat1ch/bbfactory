@@ -330,6 +330,7 @@ export const factoryRpcContract = defineRpcContract({
       expectedVersion: z.number().int(),
       spec: specSchema,
       changeReason: z.string().min(1),
+      environmentId: id.optional(),
     }),
     output: taskDetailSchema,
   },

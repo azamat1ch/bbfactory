@@ -682,6 +682,45 @@ export function createFactoryService(
           throw new Error(
             "Specification changed; reload before proposing another revision",
           );
+        const targetChanged =
+          input.environmentId !== undefined &&
+          input.environmentId !== detail.task.environmentId;
+        const previousEnvironmentId = detail.task.environmentId;
+        if (targetChanged) {
+          if (
+            detail.task.archived ||
+            detail.task.stopRequested ||
+            store.verifying(input.taskId)
+          )
+            throw new Error(
+              "Workspace changes require an active, settled task",
+            );
+          await native(detail, false);
+          if (
+            detail.assignments.some(
+              (a) => !["succeeded", "failed"].includes(a.nativeStatus),
+            )
+          )
+            throw new Error("Workspace changes require settled assignments");
+          const environmentId = input.environmentId!;
+          const target = await workspace(environmentId);
+          const state = await content(environmentId);
+          if (!state.complete)
+            throw new Error(
+              "Target workspace content cannot be captured: " + state.detail,
+            );
+          detail.task.environmentId = environmentId;
+          detail.task.projectId = target.projectId;
+          detail.invalidatedEvidenceIds = [
+            ...new Set([
+              ...detail.invalidatedEvidenceIds,
+              ...detail.evidence.map((e) => e.id),
+              ...detail.judgments.map((j) => j.id),
+              ...detail.reviews.map((r) => r.id),
+            ]),
+          ];
+          detail.observedContent = state;
+        }
         const version = detail.task.specVersion + 1;
         const spec = {
           version,
@@ -699,6 +738,13 @@ export function createFactoryService(
               : "Specification changed; independent checks must run again",
         });
         db.transaction(() => {
+          if (targetChanged)
+            store.artifact(randomUUID(), input.taskId, "workspace-change", {
+              previousEnvironmentId,
+              environmentId: detail.task.environmentId,
+              specVersion: version,
+              changeReason: input.changeReason,
+            });
           store.artifact(
             `${input.taskId}:spec:${version}`,
             input.taskId,
