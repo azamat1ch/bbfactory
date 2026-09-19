@@ -547,6 +547,67 @@ describe("builtin plugin reconciliation", () => {
     expect(loadCount()).toBe(0);
   });
 
+  it.each([true, false])(
+    "migrates a relocated local Factory source without uninstalling (enabled=%s)",
+    async (enabled) => {
+      const { targetRoot } = await copyPackagedBuiltinRuntime(workDir, [
+        "factory-team",
+      ]);
+      const oldRoot = join(workDir, "checkout", "plugins", "factory-team");
+      const newRoot = join(workDir, "checkout", "plugins", "factory");
+      await mkdir(newRoot, { recursive: true });
+      await writeFile(
+        join(newRoot, "package.json"),
+        JSON.stringify({ name: "bb-plugin-factory-team" }),
+      );
+      db.$client
+        .prepare(
+          `INSERT INTO plugins (id, source, root_dir, version, enabled, removed_at, installed_at, updated_at) VALUES ('factory-team', ?, ?, '0.1.0', ?, NULL, 10, 20)`,
+        )
+        .run(`path:${oldRoot}`, oldRoot, enabled ? 1 : 0);
+      const dataDir = join(workDir, "data");
+      const stored = join(
+        dataDir,
+        "plugins",
+        "factory-team",
+        "preserved-records",
+      );
+      await mkdir(dirname(stored), { recursive: true });
+      await writeFile(stored, "existing preferences, specs and history");
+      service = createService({
+        db,
+        dataDir,
+        builtinName: "factory",
+        pluginId: "factory-team",
+        rootDir: join(targetRoot, "factory-team"),
+      });
+      await service.start();
+      expect(getInstalledPluginRegistration(db, "factory-team")).toMatchObject({
+        source: "builtin:factory",
+        enabled,
+        installedAt: 10,
+        removedAt: null,
+      });
+      expect(await readFile(stored, "utf8")).toBe(
+        "existing preferences, specs and history",
+      );
+      await service.stop();
+      service = createService({
+        db,
+        dataDir,
+        builtinName: "factory",
+        pluginId: "factory-team",
+        rootDir: join(targetRoot, "factory-team"),
+      });
+      await service.start();
+      expect(getInstalledPluginRegistration(db, "factory-team")).toMatchObject({
+        source: "builtin:factory",
+        enabled,
+        installedAt: 10,
+      });
+    },
+  );
+
   it.each([
     { owner: "workflows", action: "disable" },
     { owner: "workflows", action: "remove" },

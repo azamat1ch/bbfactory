@@ -14,15 +14,17 @@ available; new Factory assignments call the embedded execution module directly.
 - Factory card tests: 25 passing; records: 30 passing; native task integration and
   migration/composition tests pass. Combined verification methods, stale evidence,
   exact selected approval, delivery history and import without acceptance are covered.
-- Builtin installation/lifecycle: 40 passing, including both owners' disable/remove
-  guards and preserved saved enablement. Standalone Workflows: 255 passing.
+- Builtin installation/lifecycle: 42 passing, including both owners' disable/remove
+  guards, preserved saved enablement, and migration of the removed local
+  `plugins/factory-team` source to the builtin without uninstalling. Standalone Workflows: 255 passing.
 - Codex and ACP adapter context tests: 64 passing. Prepared-context diagnostics and
   CLI tests pass. Factory, server and CLI typechecks pass.
 - Isolated built app with Workflows disabled launched real Codex and Devin workers.
   Fresh lead/worker configuration showed the intended Factory skill/tool separation.
   A 100-requirement card was inspected in Chrome; a real column-alignment defect was
-  fixed and the resulting wrapping layout inspected again. No synthetic human
-  approval was recorded.
+  fixed and the resulting wrapping layout inspected again. A real Codex worker also returned `READY`, then `CONTINUED` in the same
+  thread under a new tracked assignment, with both results retained. No synthetic
+  human approval was recorded.
 - App, server, daemon, CLI and bundled plugins build through Turbo with one heavy
   job at a time. Test runners use one worker. This is cooperative resource control.
 
