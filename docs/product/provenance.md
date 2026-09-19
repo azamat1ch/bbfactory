@@ -10,8 +10,11 @@
 - **Pragmatic Orchestration:** [CodeAlive-AI/pragmatic-orchestration](https://github.com/CodeAlive-AI/pragmatic-orchestration/tree/061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5),
   inspected at `061bcd6b58a596bc0e1e5403c6aa5c0bdb195ae5`. Practices and source
   inventory inform the design. Porch was used externally during bootstrap;
-  its runtime is not vendored or required by this distribution. Preserve its
-  applicable notices if code or prompts are adapted later.
+  its runtime is not vendored or required by this distribution. The
+  consolidated `factory` skill's `prompts/` assets remain adapted from this
+  upstream under its MIT license; the adaptation ledger lives in
+  [factory-skill-mapping.md](factory-skill-mapping.md) and the historical
+  package migration docs.
 
 Inherited BB capabilities include workspace/runtime, threads, providers,
 Workflows, plugin UI and account/usage facilities. Planned bbfactory work adds
